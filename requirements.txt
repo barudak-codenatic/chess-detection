@@ -1,0 +1,9 @@
+Flask
+opencv-python
+numpy
+Flask-SQLAlchemy
+Flask-Bcrypt
+Flask-Login
+PyMySQL
+python-dotenv
+cryptography

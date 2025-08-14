@@ -1,1 +1,3 @@
 /dataset
+.env
+/app/__pycache__/
