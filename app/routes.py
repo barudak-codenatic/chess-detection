@@ -1,6 +1,6 @@
-from flask import render_template, redirect, url_for, request, flash
+from flask import render_template, redirect, url_for, request, flash, jsonify
 from flask_login import login_user, logout_user, current_user, login_required
-from models import db, User, Match
+from models import db, User, Match, GameSession
 
 def init_routes(app, login_manager):
 
@@ -76,6 +76,12 @@ def init_routes(app, login_manager):
         new_match = Match(player1_id=player1_id, player2_id=player2_id)
         db.session.add(new_match)
         db.session.commit()
+        
+        # Buat game session
+        game_session = GameSession(match_id=new_match.id, current_player=1)
+        db.session.add(game_session)
+        db.session.commit()
+        
         flash('Pertandingan berhasil dibuat', 'success')
         return redirect(url_for('admin_dashboard'))
 
@@ -99,4 +105,27 @@ def init_routes(app, login_manager):
             flash('Anda tidak memiliki akses ke pertandingan ini', 'danger')
             return redirect(url_for('player_dashboard'))
         
-        return render_template('match_detail.html', match=match)
+        # Get atau buat game session
+        session = GameSession.query.filter_by(match_id=match_id).first()
+        if not session:
+            session = GameSession(match_id=match_id, current_player=1)
+            db.session.add(session)
+            db.session.commit()
+        
+        if current_user.role == 'admin':
+            return render_template('match_detail_admin.html', match=match, session=session)
+        else:
+            return render_template('match_detail_player.html', match=match, session=session)
+
+    @app.route('/api/session/<int:match_id>')
+    @login_required
+    def get_session(match_id):
+        session = GameSession.query.filter_by(match_id=match_id).first()
+        if session:
+            return jsonify({
+                'player1_time': session.player1_time,
+                'player2_time': session.player2_time,
+                'current_player': session.current_player,
+                'is_active': session.is_active
+            })
+        return jsonify({'error': 'Session not found'}), 404

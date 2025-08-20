@@ -7,3 +7,5 @@ Flask-Login
 PyMySQL
 python-dotenv
 cryptography
+Flask-SocketIO
+python-socketio

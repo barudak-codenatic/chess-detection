@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChessMon - Chess Timer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        .timer-card {
+            height: 45vh;
+            border: 3px solid #dee2e6;
+            transition: all 0.3s ease;
+        }
+        .timer-card.active {
+            border-color: #28a745;
+            box-shadow: 0 0 20px rgba(40, 167, 69, 0.3);
+        }
+        .timer-display {
+            font-size: 3rem;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+        }
+        .player-name {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        .control-btn {
+            width: 100%;
+            height: 60px;
+            font-size: 1.2rem;
+            margin: 10px 0;
+        }
+        @media (max-width: 768px) {
+            .timer-display {
+                font-size: 2.5rem;
+            }
+            .player-name {
+                font-size: 1.2rem;
+            }
+        }
+        @media (max-width: 576px) {
+            .timer-display {
+                font-size: 2rem;
+            }
+            .timer-card {
+                height: 40vh;
+            }
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <nav class="navbar navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('player_dashboard') }}">
+                ← Back to Dashboard
+            </a>
+            <span class="navbar-text">Match #{{ match.id }}</span>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-3">
+        <!-- Player 2 Timer (Top) -->
+        <div class="row mb-2">
+            <div class="col-12">
+                <div class="card timer-card" id="player2-card" onclick="switchToPlayer(1)">
+                    <div class="card-body d-flex flex-column justify-content-center align-items-center text-center">
+                        <div class="player-name text-muted mb-2">
+                            {{ match.player2.username }}
+                            <small class="badge bg-secondary">Player 2</small>
+                        </div>
+                        <div class="timer-display text-primary" id="player2-time">10:00</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Control Panel -->
+        <div class="row mb-2">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body p-2">
+                        <div class="row text-center">
+                            <div class="col-4">
+                                <button class="btn btn-success control-btn" id="start-btn" onclick="startTimer()">
+                                    START
+                                </button>
+                            </div>
+                            <div class="col-4">
+                                <button class="btn btn-warning control-btn" id="pause-btn" onclick="pauseTimer()">
+                                    PAUSE
+                                </button>
+                            </div>
+                            <div class="col-4">
+                                <button class="btn btn-danger control-btn" id="reset-btn" onclick="resetTimer()">
+                                    RESET
+                                </button>
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-12 text-center">
+                                <small class="text-muted">Current Turn: <span id="current-turn">{{ match.player1.username }}</span></small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Player 1 Timer (Bottom) -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card timer-card active" id="player1-card" onclick="switchToPlayer(2)">
+                    <div class="card-body d-flex flex-column justify-content-center align-items-center text-center">
+                        <div class="timer-display text-success" id="player1-time">10:00</div>
+                        <div class="player-name text-muted mt-2">
+                            {{ match.player1.username }}
+                            <small class="badge bg-primary">Player 1</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Socket.IO Connection
+        const socket = io();
+        const matchId = {{ match.id }};
+        let currentPlayer = {{ session.current_player }};
+        let isActive = {{ 'true' if session.is_active else 'false' }};
+        let player1Time = {{ session.player1_time }};
+        let player2Time = {{ session.player2_time }};
+        let timerInterval;
+
+        // Join match room
+        socket.emit('join_match', {match_id: matchId});
+
+        // Format time untuk display
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        // Update timer display
+        function updateDisplay() {
+            document.getElementById('player1-time').textContent = formatTime(player1Time);
+            document.getElementById('player2-time').textContent = formatTime(player2Time);
+            
+            // Update active player visual
+            const player1Card = document.getElementById('player1-card');
+            const player2Card = document.getElementById('player2-card');
+            
+            if (currentPlayer === 1) {
+                player1Card.classList.add('active');
+                player2Card.classList.remove('active');
+                document.getElementById('current-turn').textContent = '{{ match.player1.username }}';
+            } else {
+                player2Card.classList.add('active');
+                player1Card.classList.remove('active');
+                document.getElementById('current-turn').textContent = '{{ match.player2.username }}';
+            }
+        }
+
+        // Timer countdown
+        function startCountdown() {
+            if (!isActive) return;
+            
+            timerInterval = setInterval(() => {
+                if (currentPlayer === 1) {
+                    player1Time--;
+                    if (player1Time <= 0) {
+                        player1Time = 0;
+                        pauseTimer();
+                        alert('{{ match.player1.username }} kehabisan waktu!');
+                    }
+                } else {
+                    player2Time--;
+                    if (player2Time <= 0) {
+                        player2Time = 0;
+                        pauseTimer();
+                        alert('{{ match.player2.username }} kehabisan waktu!');
+                    }
+                }
+                
+                updateDisplay();
+                
+                // Sync dengan server
+                socket.emit('timer_update', {
+                    match_id: matchId,
+                    player: currentPlayer,
+                    time: currentPlayer === 1 ? player1Time : player2Time,
+                    current_player: currentPlayer,
+                    is_active: isActive
+                });
+            }, 1000);
+        }
+
+        // Control functions
+        function startTimer() {
+            isActive = true;
+            startCountdown();
+            updateButtons();
+        }
+
+        function pauseTimer() {
+            isActive = false;
+            clearInterval(timerInterval);
+            updateButtons();
+        }
+
+        function resetTimer() {
+            pauseTimer();
+            player1Time = 600; // 10 menit
+            player2Time = 600;
+            currentPlayer = 1;
+            updateDisplay();
+            
+            socket.emit('timer_update', {
+                match_id: matchId,
+                player: currentPlayer,
+                time: player1Time,
+                current_player: currentPlayer,
+                is_active: false
+            });
+        }
+
+        function switchToPlayer(nextPlayer) {
+            if (!isActive) return;
+            
+            currentPlayer = nextPlayer;
+            updateDisplay();
+            
+            socket.emit('switch_player', {
+                match_id: matchId
+            });
+        }
+
+        function updateButtons() {
+            const startBtn = document.getElementById('start-btn');
+            const pauseBtn = document.getElementById('pause-btn');
+            
+            if (isActive) {
+                startBtn.disabled = true;
+                pauseBtn.disabled = false;
+            } else {
+                startBtn.disabled = false;
+                pauseBtn.disabled = true;
+            }
+        }
+
+        // Socket listeners
+        socket.on('timer_sync', function(data) {
+            player1Time = data.player1_time;
+            player2Time = data.player2_time;
+            currentPlayer = data.current_player;
+            isActive = data.is_active;
+            updateDisplay();
+            updateButtons();
+        });
+
+        socket.on('player_switched', function(data) {
+            currentPlayer = data.current_player;
+            updateDisplay();
+        });
+
+        // Initialize
+        updateDisplay();
+        updateButtons();
+        
+        if (isActive) {
+            startCountdown();
+        }
+    </script>
+</body>
+</html>

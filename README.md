@@ -14,7 +14,6 @@ Web-based chess tournament management system built with **Flask** & **MySQL**.
 ```bash
 # Clone repo & install dependencies
 git clone <repo-url>
-cd ChessMon
 pip install -r requirements.txt
 
 # Setup database
