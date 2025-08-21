@@ -70,23 +70,45 @@ def init_routes(app, login_manager):
     def create_match():
         if current_user.role != 'admin':
             return redirect(url_for('player_dashboard'))
+        
         player1_id = request.form['player1_id']
         player2_id = request.form['player2_id']
+        time_control = request.form['time_control']
         
         if player1_id == player2_id:
             flash('Player 1 dan Player 2 harus berbeda', 'danger')
             return redirect(url_for('admin_dashboard'))
         
-        new_match = Match(player1_id=player1_id, player2_id=player2_id)
+        # Tentukan timer settings berdasarkan time control
+        if time_control == 'custom':
+            initial_time = int(request.form['custom_minutes']) * 60
+            increment = int(request.form['custom_increment'])
+        else:
+            settings = Match.TIME_CONTROLS[time_control]
+            initial_time = settings['initial']
+            increment = settings['increment']
+        
+        new_match = Match(
+            player1_id=player1_id, 
+            player2_id=player2_id,
+            time_control=time_control,
+            initial_time=initial_time,
+            increment=increment
+        )
         db.session.add(new_match)
         db.session.commit()
         
-        # Buat game session
-        game_session = GameSession(match_id=new_match.id, current_player=1)
+        # Buat game session dengan timer sesuai match
+        game_session = GameSession(
+            match_id=new_match.id, 
+            current_player=1,
+            player1_time=initial_time,
+            player2_time=initial_time
+        )
         db.session.add(game_session)
         db.session.commit()
         
-        flash('Pertandingan berhasil dibuat', 'success')
+        flash(f'Pertandingan {time_control} berhasil dibuat', 'success')
         return redirect(url_for('admin_dashboard'))
 
     @app.route('/player')

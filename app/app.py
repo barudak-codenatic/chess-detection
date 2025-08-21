@@ -78,15 +78,17 @@ def on_admin_control(data):
     match_id = data['match_id']
     action = data['action']
     session = GameSession.query.filter_by(match_id=match_id).first()
+    match = Match.query.get(match_id)
     
-    if session:
+    if session and match:
         if action == 'start':
             session.is_active = True
         elif action == 'pause':
             session.is_active = False
         elif action == 'reset':
-            session.player1_time = 600
-            session.player2_time = 600
+            # Reset ke waktu sesuai mode yang dipilih saat match dibuat
+            session.player1_time = match.initial_time
+            session.player2_time = match.initial_time
             session.current_player = 1
             session.is_active = False
         
@@ -96,7 +98,10 @@ def on_admin_control(data):
             'player1_time': session.player1_time,
             'player2_time': session.player2_time,
             'current_player': session.current_player,
-            'is_active': session.is_active
+            'is_active': session.is_active,
+            'time_control': match.time_control,  # Tambahkan info time control
+            'initial_time': match.initial_time,   # Tambahkan info waktu awal
+            'increment': match.increment          # Tambahkan info increment
         }, room=f"match_{match_id}")
 
 if __name__ == '__main__':

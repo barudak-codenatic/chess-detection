@@ -25,8 +25,21 @@ class Match(db.Model):
     date_created = db.Column(db.DateTime, default=datetime.now)
     status = db.Column(db.String(20), default='waiting')  # waiting, active, paused, finished
     
+    # Timer settings - TAMBAHAN BARU
+    time_control = db.Column(db.String(20), default='rapid')  # rapid, blitz, bullet, custom
+    initial_time = db.Column(db.Integer, default=600)  # dalam detik
+    increment = db.Column(db.Integer, default=10)  # increment per move dalam detik
+    
     player1 = db.relationship('User', foreign_keys=[player1_id])
     player2 = db.relationship('User', foreign_keys=[player2_id])
+    
+    # Time control presets
+    TIME_CONTROLS = {
+        'bullet': {'initial': 60, 'increment': 1, 'display': '1+1'},       # 1 menit + 1 detik
+        'blitz': {'initial': 300, 'increment': 3, 'display': '5+3'},      # 5 menit + 3 detik  
+        'rapid': {'initial': 600, 'increment': 10, 'display': '10+10'},   # 10 menit + 10 detik
+        'classical': {'initial': 1800, 'increment': 30, 'display': '30+30'} # 30 menit + 30 detik
+    }
 
 class GameSession(db.Model):
     id = db.Column(db.Integer, primary_key=True)

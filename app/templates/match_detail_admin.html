@@ -161,10 +161,13 @@
                         </div>
                     </div>
                     
+                    <!-- Update bagian timer display HTML untuk menampilkan waktu sesuai mode -->
                     <div class="grid grid-cols-2 gap-6 mb-6">
                         <div class="text-center p-4 bg-amber-100 rounded-xl border-2 border-amber-300">
                             <h3 class="text-lg font-bold text-amber-900 mb-2">{{ match.player1.username }}</h3>
-                            <div class="timer-display text-green-700" id="player1-time">10:00</div>
+                            <div class="timer-display text-green-700" id="player1-time">
+                                {{ '{:d}:{:02d}'.format(match.initial_time // 60, match.initial_time % 60) }}
+                            </div>
                             <div class="flex items-center justify-center mt-2">
                                 <i class="fas fa-chess-king text-amber-600 mr-2"></i>
                                 <span class="text-sm font-medium text-amber-700">Player 1</span>
@@ -172,7 +175,9 @@
                         </div>
                         <div class="text-center p-4 bg-amber-100 rounded-xl border-2 border-amber-300">
                             <h3 class="text-lg font-bold text-amber-900 mb-2">{{ match.player2.username }}</h3>
-                            <div class="timer-display text-blue-700" id="player2-time">10:00</div>
+                            <div class="timer-display text-blue-700" id="player2-time">
+                                {{ '{:d}:{:02d}'.format(match.initial_time // 60, match.initial_time % 60) }}
+                            </div>
                             <div class="flex items-center justify-center mt-2">
                                 <i class="fas fa-chess-queen text-amber-600 mr-2"></i>
                                 <span class="text-sm font-medium text-amber-700">Player 2</span>
@@ -223,6 +228,16 @@
                         <div class="flex justify-between items-center p-3 bg-amber-100 rounded-lg">
                             <span class="font-semibold text-amber-800">Match ID:</span>
                             <span class="bg-amber-200 px-3 py-1 rounded-full text-sm font-bold text-amber-900">#{{ match.id }}</span>
+                        </div>
+                        <!-- TAMBAHAN BARU - Time Control Info -->
+                        <div class="flex justify-between items-center p-3 bg-blue-100 rounded-lg">
+                            <span class="font-semibold text-blue-800">Time Control:</span>
+                            <span class="flex items-center text-blue-700">
+                                <i class="fas fa-stopwatch mr-2"></i>
+                                <span class="bg-blue-200 px-3 py-1 rounded-full text-sm font-bold text-blue-900">
+                                    {{ match.time_control.upper() }} ({{ (match.initial_time // 60) }}+{{ match.increment }})
+                                </span>
+                            </span>
                         </div>
                         <div class="flex justify-between items-center p-3 bg-amber-100 rounded-lg">
                             <span class="font-semibold text-amber-800">Created:</span>
@@ -399,6 +414,27 @@
             
             const indicator = document.getElementById('status-indicator');
             indicator.className = 'status-indicator ' + (data.is_active ? 'status-active' : 'status-paused');
+            
+            // Update time control info jika ada
+            if (data.time_control && data.initial_time) {
+                const timeControlInfo = getTimeControlDisplay(data.time_control, data.initial_time, data.increment);
+                // Update display time control info jika diperlukan
+            }
+        }
+
+        // Tambahkan function untuk menampilkan info time control
+        function getTimeControlDisplay(timeControl, initialTime, increment) {
+            const minutes = Math.floor(initialTime / 60);
+            return `${timeControl.toUpperCase()} (${minutes}+${increment})`;
+        }
+
+        // Update admin reset function
+        function adminResetTimer() {
+            socket.emit('admin_control', {
+                match_id: matchId,
+                action: 'reset'
+            });
+            logAction('Admin reset to {{ match.time_control.upper() }} mode ({{ (match.initial_time // 60) }}+{{ match.increment }} seconds)');
         }
 
         let videoStream = null;
@@ -702,7 +738,7 @@
                 match_id: matchId,
                 action: 'start'
             });
-            logAction('Admin started timer');
+            logAction('Admin started {{ match.time_control }} timer');
         }
 
         function adminPauseTimer() {
@@ -710,7 +746,7 @@
                 match_id: matchId,
                 action: 'pause'
             });
-            logAction('Admin paused timer');
+            logAction('Admin paused {{ match.time_control }} timer');
         }
 
         function adminResetTimer() {
@@ -718,7 +754,7 @@
                 match_id: matchId,
                 action: 'reset'
             });
-            logAction('Admin reset timer');
+            logAction('Admin reset to {{ match.time_control.upper() }} mode ({{ (match.initial_time // 60) }}+{{ match.increment }} seconds)');
         }
 
         // Initialize when page loads
@@ -742,9 +778,10 @@
         // Socket listeners
         socket.on('timer_sync', function(data) {
             updateDisplay(data);
-            // Reduced logging to avoid spam
-            if (Math.random() < 0.2) { // 20% chance to log
-                logAction(`Timer sync - Player ${data.current_player}: ${formatTime(data.current_player === 1 ? data.player1_time : data.player2_time)}`);
+            // Log dengan info time control
+            if (data.time_control && data.initial_time) {
+                const timeInfo = `${data.time_control.toUpperCase()} (${Math.floor(data.initial_time / 60)}+${data.increment || 0})`;
+                logAction(`Timer sync [${timeInfo}] - Player ${data.current_player}: ${formatTime(data.current_player === 1 ? data.player1_time : data.player2_time)}`);
             }
         });
 
