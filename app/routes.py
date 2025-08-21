@@ -1,6 +1,10 @@
 from flask import render_template, redirect, url_for, request, flash, jsonify
 from flask_login import login_user, logout_user, current_user, login_required
 from models import db, User, Match, GameSession
+from chess_detection import ChessDetectionService
+import base64
+import cv2
+import numpy as np
 
 def init_routes(app, login_manager):
 
@@ -129,3 +133,58 @@ def init_routes(app, login_manager):
                 'is_active': session.is_active
             })
         return jsonify({'error': 'Session not found'}), 404
+
+    # Initialize detection service
+    detection_service = ChessDetectionService()
+
+    @app.route('/api/detect', methods=['POST'])
+    @login_required
+    def detect_chess():
+        if current_user.role != 'admin':
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        try:
+            data = request.get_json()
+            if not data or 'image' not in data:
+                return jsonify({'error': 'No image data provided'}), 400
+                
+            image_data = data.get('image')
+            mode = data.get('mode', 'raw')
+            show_bbox = data.get('show_bbox', True)
+            
+            # Decode base64 image
+            try:
+                image_data_clean = image_data.split(',')[1]
+                image_bytes = base64.b64decode(image_data_clean)
+                nparr = np.frombuffer(image_bytes, np.uint8)
+                image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                
+                if image is None:
+                    return jsonify({'error': 'Failed to decode image'}), 400
+                    
+                image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            except Exception as e:
+                return jsonify({'error': f'Image decoding error: {str(e)}'}), 400
+            
+            # Run detection
+            result_image, detection_results = detection_service.detect_pieces(image, mode, show_bbox)
+            detections = detection_service.get_detection_data(detection_results)
+            
+            # Encode result image back to base64
+            try:
+                result_image_bgr = cv2.cvtColor(result_image, cv2.COLOR_RGB2BGR)
+                _, buffer = cv2.imencode('.jpg', result_image_bgr, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                result_base64 = base64.b64encode(buffer).decode('utf-8')
+            except Exception as e:
+                return jsonify({'error': f'Image encoding error: {str(e)}'}), 500
+            
+            return jsonify({
+                'image': f"data:image/jpeg;base64,{result_base64}",
+                'detections': detections,
+                'piece_count': len(detections),
+                'mode': mode,
+                'show_bbox': show_bbox
+            })
+            
+        except Exception as e:
+            return jsonify({'error': f'Detection service error: {str(e)}'}), 500

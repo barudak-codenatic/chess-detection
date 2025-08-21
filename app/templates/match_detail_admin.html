@@ -155,6 +155,27 @@
                     </div>
                 </div>
 
+                <!-- Admin Timer Controls -->
+                <div class="mt-6">
+                    <div class="grid grid-cols-3 gap-3">
+                        <button 
+                            class="btn-elegant bg-green-600 hover:bg-green-700 text-white py-3 px-4 rounded-xl font-bold text-sm transition-all duration-200 flex items-center justify-center"
+                            onclick="adminStartTimer()">
+                            <i class="fas fa-play mr-2"></i>START
+                        </button>
+                        <button 
+                            class="btn-elegant bg-yellow-600 hover:bg-yellow-700 text-white py-3 px-4 rounded-xl font-bold text-sm transition-all duration-200 flex items-center justify-center"
+                            onclick="adminPauseTimer()">
+                            <i class="fas fa-pause mr-2"></i>PAUSE
+                        </button>
+                        <button 
+                            class="btn-elegant bg-red-600 hover:bg-red-700 text-white py-3 px-4 rounded-xl font-bold text-sm transition-all duration-200 flex items-center justify-center"
+                            onclick="adminResetTimer()">
+                            <i class="fas fa-redo mr-2"></i>RESET
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Match Info -->
                 <div class="card-elegant rounded-2xl p-6 border-2 border-amber-200">
                     <div class="flex items-center mb-4">
@@ -186,38 +207,96 @@
                 </div>
             </div>
 
-            <!-- Camera Feed -->
+           <!-- Camera Detection Section -->
             <div class="space-y-6">
                 <div class="card-elegant rounded-2xl p-6 border-2 border-amber-200">
-                    <div class="flex items-center mb-6">
-                        <i class="fas fa-video text-2xl text-amber-800 mr-3"></i>
-                        <h2 class="text-xl font-bold text-amber-900">Live Camera Feed</h2>
+                    <div class="flex justify-between items-center mb-6">
+                        <div class="flex items-center">
+                            <i class="fas fa-camera text-2xl text-amber-800 mr-3"></i>
+                            <h2 class="text-xl font-bold text-amber-900">Live Chess Detection</h2>
+                        </div>
+                        <button 
+                            class="btn-elegant bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm transition-all duration-200 flex items-center"
+                            onclick="toggleFullscreen()">
+                            <i class="fas fa-expand mr-2"></i>Fullscreen
+                        </button>
                     </div>
-                    <div class="camera-placeholder">
-                        <div class="text-center">
-                            <i class="fas fa-camera text-6xl text-gray-400 mb-4"></i>
-                            <p class="text-gray-600 font-medium mb-4">Camera feed akan ditampilkan di sini</p>
-                            <button class="bg-amber-700 hover:bg-amber-800 text-white px-6 py-3 rounded-xl transition-all duration-200 font-medium btn-elegant" onclick="startCamera()">
-                                <i class="fas fa-play mr-2"></i>Start Camera
-                            </button>
+                    
+                    <!-- Camera Selection -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-amber-800 mb-2">Select Camera:</label>
+                        <select id="camera-select" class="w-full p-3 border-2 border-amber-300 rounded-lg bg-amber-50 text-amber-900 focus:border-amber-500 focus:outline-none">
+                            <option value="">Select Camera</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Detection Mode -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-amber-800 mb-2">Detection Mode:</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <label class="flex items-center p-3 border-2 border-amber-300 rounded-lg cursor-pointer hover:bg-amber-100 transition-colors">
+                                <input type="radio" name="detection-mode" value="raw" checked class="mr-3 text-amber-600">
+                                <span class="font-medium text-amber-800">Raw</span>
+                            </label>
+                            <label class="flex items-center p-3 border-2 border-amber-300 rounded-lg cursor-pointer hover:bg-amber-100 transition-colors">
+                                <input type="radio" name="detection-mode" value="clahe" class="mr-3 text-amber-600">
+                                <span class="font-medium text-amber-800">CLAHE</span>
+                            </label>
                         </div>
                     </div>
-                    <video id="camera-feed" class="w-full rounded-xl hidden" autoplay></video>
-                </div>
-
-                <!-- Chess Board Detection -->
-                <div class="card-elegant rounded-2xl p-6 border-2 border-amber-200">
-                    <div class="flex items-center mb-4">
-                        <i class="fas fa-chess-board text-2xl text-amber-800 mr-3"></i>
-                        <h3 class="text-lg font-bold text-amber-900">Board Detection</h3>
+                    
+                    <!-- Show Bounding Box Toggle -->
+                    <div class="mb-6">
+                        <label class="flex items-center p-3 bg-amber-100 rounded-lg cursor-pointer">
+                            <input type="checkbox" id="show-bbox" checked class="mr-3 text-amber-600">
+                            <span class="font-medium text-amber-800">Show Bounding Boxes</span>
+                        </label>
                     </div>
-                    <button class="w-full bg-green-700 hover:bg-green-800 text-white px-6 py-4 rounded-xl transition-all duration-200 font-bold btn-elegant" onclick="detectBoard()">
-                        <i class="fas fa-search mr-2"></i>Detect Chess Board
-                    </button>
-                    <canvas id="detection-canvas" class="w-full mt-4 rounded-xl hidden border-2 border-amber-200"></canvas>
+                    
+                    <!-- Camera Feed Display -->
+                    <div class="relative">
+                        <video id="camera-feed" class="w-full rounded-lg hidden" autoplay style="max-height: 400px; object-fit: cover;"></video>
+                        <canvas id="detection-canvas" class="w-full rounded-lg hidden border-2 border-green-500" style="max-height: 400px;"></canvas>
+                        <div id="camera-placeholder" class="camera-placeholder">
+                            <div class="text-center">
+                                <i class="fas fa-camera fa-4x text-amber-400 mb-4"></i>
+                                <p class="text-amber-600 font-medium">Camera will appear here</p>
+                                <p class="text-amber-500 text-sm">Allow camera access when prompted</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Control Buttons -->
+                    <div class="mt-6 grid grid-cols-2 lg:grid-cols-5 gap-3">
+                        <button 
+                            class="btn-elegant bg-green-600 hover:bg-green-700 text-white py-3 px-4 rounded-lg font-medium transition-all duration-200 flex items-center justify-center"
+                            onclick="startCamera()">
+                            <i class="fas fa-video mr-2"></i>Start Camera
+                        </button>
+                        <button 
+                            class="btn-elegant bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg font-medium transition-all duration-200 flex items-center justify-center"
+                            onclick="startDetection()">
+                            <i class="fas fa-search mr-2"></i>Detect
+                        </button>
+                        <button 
+                            class="btn-elegant bg-yellow-600 hover:bg-yellow-700 text-white py-3 px-4 rounded-lg font-medium transition-all duration-200 flex items-center justify-center"
+                            onclick="pauseDetection()">
+                            <i class="fas fa-pause mr-2"></i>Pause
+                        </button>
+                        <button 
+                            class="btn-elegant bg-red-600 hover:bg-red-700 text-white py-3 px-4 rounded-lg font-medium transition-all duration-200 flex items-center justify-center"
+                            onclick="stopCamera()">
+                            <i class="fas fa-stop mr-2"></i>Stop
+                        </button>
+                        <!-- Temporary test button -->
+                        <button 
+                            class="btn-elegant bg-purple-600 hover:bg-purple-700 text-white py-3 px-4 rounded-lg font-medium transition-all duration-200 flex items-center justify-center"
+                            onclick="testDetection()">
+                            <i class="fas fa-bug mr-2"></i>Test
+                        </button>
+                    </div>
                 </div>
             </div>
-        </div>
 
         <!-- Action Log -->
         <div class="mt-8">
@@ -284,33 +363,351 @@
             indicator.className = 'status-indicator ' + (data.is_active ? 'status-active' : 'status-paused');
         }
 
-        // Camera functions
-        async function startCamera() {
+        let videoStream = null;
+        let detectionInterval = null;
+        let isDetecting = false;
+        let hasPermission = false;
+
+        // Request camera permission first
+        async function requestCameraPermission() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                const video = document.getElementById('camera-feed');
-                video.srcObject = stream;
-                video.classList.remove('hidden');
-                document.querySelector('.camera-placeholder').classList.add('hidden');
-                logAction('Camera started successfully');
+                logAction('Requesting camera permission...');
+                
+                // Request basic camera access to get permission
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: true, 
+                    audio: false 
+                });
+                
+                // Stop the stream immediately, we just needed permission
+                stream.getTracks().forEach(track => track.stop());
+                
+                hasPermission = true;
+                logAction('Camera permission granted');
+                
+                // Now get the actual camera list
+                await getCameras();
+                
+                return true;
             } catch (error) {
-                alert('Error accessing camera: ' + error.message);
-                logAction('Camera error: ' + error.message);
+                hasPermission = false;
+                logAction('Camera permission denied: ' + error.message);
+                
+                if (error.name === 'NotAllowedError') {
+                    alert('Camera access denied. Please allow camera access and refresh the page.');
+                } else if (error.name === 'NotFoundError') {
+                    alert('No camera found. Please connect a camera and refresh the page.');
+                } else {
+                    alert('Error accessing camera: ' + error.message);
+                }
+                
+                return false;
             }
         }
 
-        function detectBoard() {
-            logAction('Board detection initiated');
-            // Placeholder untuk chess board detection
-            setTimeout(() => {
-                logAction('Board detection completed');
-            }, 2000);
+        // Get available cameras (after permission granted)
+        async function getCameras() {
+            if (!hasPermission) {
+                logAction('Camera permission required');
+                return;
+            }
+
+            try {
+                logAction('Scanning for available cameras...');
+                
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                const select = document.getElementById('camera-select');
+                
+                select.innerHTML = '<option value="">Select Camera</option>';
+                
+                if (videoDevices.length === 0) {
+                    logAction('No cameras found');
+                    alert('No cameras detected. Please connect a camera and try again.');
+                    return;
+                }
+                
+                videoDevices.forEach((device, index) => {
+                    const option = document.createElement('option');
+                    option.value = device.deviceId;
+                    // Show device label if available, otherwise use generic name
+                    option.text = device.label || `Camera ${index + 1}`;
+                    select.appendChild(option);
+                    
+                    logAction(`Found camera: ${device.label || `Camera ${index + 1}`}`);
+                });
+                
+                logAction(`Total ${videoDevices.length} camera(s) detected`);
+                
+            } catch (error) {
+                logAction('Error scanning cameras: ' + error.message);
+                console.error('Error getting cameras:', error);
+            }
         }
+
+        // Start camera
+        async function startCamera() {
+            const cameraSelect = document.getElementById('camera-select');
+            const deviceId = cameraSelect.value;
+            
+            if (!hasPermission) {
+                logAction('Requesting camera permission first...');
+                const granted = await requestCameraPermission();
+                if (!granted) return;
+            }
+            
+            if (!deviceId) {
+                alert('Please select a camera first');
+                return;
+            }
+            
+            try {
+                logAction('Starting camera...');
+                
+                // Stop existing stream if any
+                if (videoStream) {
+                    videoStream.getTracks().forEach(track => track.stop());
+                }
+                
+                const constraints = {
+                    video: {
+                        deviceId: { exact: deviceId },
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                };
+                
+                videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+                const video = document.getElementById('camera-feed');
+                
+                video.srcObject = videoStream;
+                video.classList.remove('hidden'); // Ganti dari 'd-none' ke 'hidden'
+                document.getElementById('camera-placeholder').classList.add('hidden');
+                
+                // Wait for video to load
+                video.onloadedmetadata = () => {
+                    logAction(`Camera started: ${video.videoWidth}x${video.videoHeight}`);
+                };
+                
+            } catch (error) {
+                logAction('Error starting camera: ' + error.message);
+                console.error('Error starting camera:', error);
+                
+                if (error.name === 'NotAllowedError') {
+                    alert('Camera access denied. Please allow camera access.');
+                } else if (error.name === 'NotFoundError') {
+                    alert('Selected camera not found. Please try another camera.');
+                } else if (error.name === 'NotReadableError') {
+                    alert('Camera is being used by another application.');
+                } else {
+                    alert('Error starting camera: ' + error.message);
+                }
+            }
+        }
+
+        // Start detection
+        function startDetection() {
+            if (!videoStream) {
+                alert('Please start camera first');
+                return;
+            }
+            
+            const video = document.getElementById('camera-feed');
+            if (video.readyState !== 4) {
+                alert('Please wait for camera to fully load');
+                return;
+            }
+            
+            isDetecting = true;
+            const canvas = document.getElementById('detection-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = 720;
+            canvas.height = 720;
+            canvas.classList.remove('hidden');
+            video.classList.add('hidden'); // Hide video, show canvas
+            
+            logAction('Starting chess piece detection...');
+            
+            detectionInterval = setInterval(async () => {
+                if (!isDetecting || !videoStream) return;
+                
+                try {
+                    // Draw video frame to canvas first
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    const imageData = canvas.toDataURL('image/jpeg', 0.8);
+                    
+                    // Get detection mode and settings
+                    const mode = document.querySelector('input[name="detection-mode"]:checked').value;
+                    const showBbox = document.getElementById('show-bbox').checked;
+                    
+                    const response = await fetch('/api/detect', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            image: imageData,
+                            mode: mode,
+                            show_bbox: showBbox
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
+                    const result = await response.json();
+                    
+                    // Display result on canvas
+                    if (result.image) {
+                        const img = new Image();
+                        img.onload = () => {
+                            ctx.clearRect(0, 0, canvas.width, canvas.height);
+                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        };
+                        img.src = result.image;
+                        
+                        // Log detections occasionally to avoid spam
+                        if (result.detections && result.detections.length > 0 && Math.random() < 0.1) {
+                            logAction(`Detected ${result.piece_count} pieces: ${result.detections.map(d => d.class_name).join(', ')}`);
+                        }
+                    }
+                    
+                } catch (error) {
+                    console.error('Detection error:', error);
+                    logAction('Detection error: ' + error.message);
+                }
+            }, 200); // 5 FPS
+            
+            logAction('Chess piece detection started (5 FPS)');
+        }
+
+        // Stop camera
+        function stopCamera() {
+            pauseDetection();
+            
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+                videoStream = null;
+            }
+            
+            document.getElementById('camera-feed').classList.add('hidden');
+            document.getElementById('detection-canvas').classList.add('hidden');
+            document.getElementById('camera-placeholder').classList.remove('hidden');
+            
+            logAction('Camera stopped');
+        }
+
+        // Test detection button untuk debugging
+        function testDetection() {
+            const canvas = document.getElementById('detection-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Create a test image
+            ctx.fillStyle = 'red';
+            ctx.fillRect(0, 0, 100, 100);
+            
+            const testImageData = canvas.toDataURL('image/jpeg', 0.8);
+            
+            fetch('/api/detect', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    image: testImageData,
+                    mode: 'raw',
+                    show_bbox: true
+                })
+            })
+            .then(response => response.json())
+            .then(result => {
+                console.log('Test detection result:', result);
+                logAction('Test detection completed: ' + JSON.stringify(result));
+            })
+            .catch(error => {
+                console.error('Test detection error:', error);
+                logAction('Test detection error: ' + error.message);
+            });
+        }
+
+        // Tambahkan tombol test di HTML (temporary untuk debugging)
+        const testButton = document.createElement('button');
+        testButton.innerText = 'Test Detection';
+        testButton.onclick = testDetection;
+        document.body.appendChild(testButton);
+
+        // Fullscreen toggle
+        function toggleFullscreen() {
+            const canvas = document.getElementById('detection-canvas');
+            const video = document.getElementById('camera-feed');
+            
+            const element = canvas.classList.contains('d-none') ? video : canvas;
+            
+            if (!document.fullscreenElement) {
+                element.requestFullscreen().then(() => {
+                    logAction('Entered fullscreen mode');
+                }).catch(err => {
+                    logAction('Error entering fullscreen: ' + err.message);
+                });
+            } else {
+                document.exitFullscreen().then(() => {
+                    logAction('Exited fullscreen mode');
+                });
+            }
+        }
+
+        // Admin timer controls
+        function adminStartTimer() {
+            socket.emit('admin_control', {
+                match_id: matchId,
+                action: 'start'
+            });
+            logAction('Admin started timer');
+        }
+
+        function adminPauseTimer() {
+            socket.emit('admin_control', {
+                match_id: matchId,
+                action: 'pause'
+            });
+            logAction('Admin paused timer');
+        }
+
+        function adminResetTimer() {
+            socket.emit('admin_control', {
+                match_id: matchId,
+                action: 'reset'
+            });
+            logAction('Admin reset timer');
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            logAction('Page loaded, initializing...');
+            
+            // Check if camera API is supported
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                logAction('Camera API not supported in this browser');
+                alert('Camera access is not supported in this browser. Please use Chrome, Firefox, or Safari.');
+                return;
+            }
+            
+            // Auto-request permission and scan cameras
+            setTimeout(async () => {
+                logAction('Auto-requesting camera permission...');
+                await requestCameraPermission();
+            }, 1000);
+        });
 
         // Socket listeners
         socket.on('timer_sync', function(data) {
             updateDisplay(data);
-            logAction(`Timer updated - Player ${data.current_player}: ${formatTime(data.current_player === 1 ? data.player1_time : data.player2_time)}`);
+            // Reduced logging to avoid spam
+            if (Math.random() < 0.2) { // 20% chance to log
+                logAction(`Timer sync - Player ${data.current_player}: ${formatTime(data.current_player === 1 ? data.player1_time : data.player2_time)}`);
+            }
         });
 
         socket.on('player_switched', function(data) {
@@ -324,10 +721,27 @@
             .then(data => {
                 if (!data.error) {
                     updateDisplay(data);
+                    logAction('Session data loaded');
                 }
+            })
+            .catch(error => {
+                logAction('Error loading session data: ' + error.message);
             });
 
         logAction('Admin monitoring started for Match #' + matchId);
+
+        // Handle page visibility change (pause detection when tab not active)
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden && isDetecting) {
+                pauseDetection();
+                logAction('Detection paused (tab inactive)');
+            }
+        });
+
+        // Cleanup when page unloads
+        window.addEventListener('beforeunload', function() {
+            stopCamera();
+        });
     </script>
 </body>
 </html>

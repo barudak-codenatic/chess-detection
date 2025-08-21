@@ -73,5 +73,31 @@ def on_switch_player(data):
             'current_player': session.current_player
         }, room=f"match_{match_id}")
 
+@socketio.on('admin_control')
+def on_admin_control(data):
+    match_id = data['match_id']
+    action = data['action']
+    session = GameSession.query.filter_by(match_id=match_id).first()
+    
+    if session:
+        if action == 'start':
+            session.is_active = True
+        elif action == 'pause':
+            session.is_active = False
+        elif action == 'reset':
+            session.player1_time = 600
+            session.player2_time = 600
+            session.current_player = 1
+            session.is_active = False
+        
+        db.session.commit()
+        
+        socketio.emit('timer_sync', {
+            'player1_time': session.player1_time,
+            'player2_time': session.player2_time,
+            'current_player': session.current_player,
+            'is_active': session.is_active
+        }, room=f"match_{match_id}")
+
 if __name__ == '__main__':
     socketio.run(app, debug=True)

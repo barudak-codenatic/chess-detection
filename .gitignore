@@ -1,3 +1,4 @@
 /dataset
 .env
 /app/__pycache__/
+/chess_detection.v2i.yolov8
