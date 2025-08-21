@@ -84,6 +84,43 @@
             background: rgba(254, 252, 251, 0.8);
             backdrop-filter: blur(5px);
         }
+        
+        /* Enhanced Dropdown Styling */
+        .select-elegant {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2378350f' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+            background-position: right 12px center;
+            background-repeat: no-repeat;
+            background-size: 16px;
+            padding-right: 48px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .select-elegant:hover {
+            background-color: #fffbeb;
+            border-color: #d97706;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(120, 53, 15, 0.15);
+        }
+        
+        .select-elegant:focus {
+            background-color: #ffffff;
+            border-color: #92400e;
+            box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.2);
+        }
+        
+        .select-elegant option {
+            background-color: #fffbeb;
+            color: #78350f;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 2px 0;
+        }
+        
+        .select-elegant option:hover {
+            background-color: #fef3c7;
+        }
     </style>
 </head>
 <body class="min-h-screen bg-amber-50 chess-board-pattern pattern-overlay">
@@ -225,7 +262,7 @@
                     <!-- Camera Selection -->
                     <div class="mb-4">
                         <label class="block text-sm font-semibold text-amber-800 mb-2">Select Camera:</label>
-                        <select id="camera-select" class="w-full p-3 border-2 border-amber-300 rounded-lg bg-amber-50 text-amber-900 focus:border-amber-500 focus:outline-none">
+                        <select id="camera-select" class="w-full p-3 border-2 border-amber-300 rounded-lg bg-amber-50 text-amber-900 focus:border-amber-500 focus:outline-none select-elegant">
                             <option value="">Select Camera</option>
                         </select>
                     </div>
@@ -318,9 +355,10 @@
     </div>
 
     <script>
-        // Socket.IO Connection
+        // Socket.IO Connection - Jinja2 Template Variables
         const socket = io();
-        const matchId = {{ match.id }};
+        // This is a Jinja2 template variable, not JavaScript
+        const matchId = parseInt('{{ match.id }}');
 
         // Join match room
         socket.emit('join_match', {match_id: matchId});

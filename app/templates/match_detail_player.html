@@ -160,13 +160,14 @@
     </div>
 
     <script>
-        // Socket.IO Connection
+        // Socket.IO Connection - Jinja2 Template Variables
         const socket = io();
-        const matchId = {{ match.id }};
-        let currentPlayer = {{ session.current_player }};
-        let isActive = {{ 'true' if session.is_active else 'false' }};
-        let player1Time = {{ session.player1_time }};
-        let player2Time = {{ session.player2_time }};
+        // These are Jinja2 template variables, not JavaScript syntax
+        const matchId = parseInt('{{ match.id }}');
+        let currentPlayer = parseInt('{{ session.current_player }}');
+        let isActive = ('{{ session.is_active }}' === 'True');
+        let player1Time = parseInt('{{ session.player1_time }}');
+        let player2Time = parseInt('{{ session.player2_time }}');
         let timerInterval;
 
         // Join match room

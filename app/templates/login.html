@@ -35,6 +35,33 @@
             box-shadow: 0 12px 25px rgba(120, 53, 15, 0.25);
         }
         
+        /* Toast Animations and Styling */
+        .toast-message {
+            animation: slideInRight 0.3s ease-out;
+        }
+        
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        .toast-close {
+            transition: all 0.2s ease;
+            padding: 4px;
+            border-radius: 4px;
+        }
+        
+        .toast-close:hover {
+            background-color: rgba(0, 0, 0, 0.1);
+            transform: scale(1.1);
+        }
+        
         .pattern-overlay {
             background-image: 
                 radial-gradient(circle at 25% 25%, rgba(251, 191, 36, 0.1) 0%, transparent 25%),
@@ -61,10 +88,15 @@
                 {% with messages = get_flashed_messages(with_categories=true) %}
                     {% if messages %}
                         {% for category, message in messages %}
-                            <div class="bg-red-100 border-l-4 border-red-500 text-red-800 px-4 py-3 rounded-lg mb-4">
-                                <div class="flex items-center">
-                                    <i class="fas fa-exclamation-triangle mr-2 text-red-600"></i>
-                                    <span class="font-semibold text-sm">{{ message }}</span>
+                            <div class="toast-message bg-red-100 border-l-4 border-red-500 text-red-800 px-4 py-3 rounded-lg mb-4 transition-all duration-300 ease-in-out">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center">
+                                        <i class="fas fa-exclamation-triangle mr-2 text-red-600"></i>
+                                        <span class="font-semibold text-sm">{{ message }}</span>
+                                    </div>
+                                    <button type="button" class="toast-close ml-4 text-gray-500 hover:text-gray-700 focus:outline-none transition-colors duration-200" onclick="closeToast(this)">
+                                        <i class="fas fa-times"></i>
+                                    </button>
                                 </div>
                             </div>
                         {% endfor %}
@@ -140,5 +172,33 @@
             </div>
         </div>
     </div>
+
+    <script>
+        // Toast close functionality
+        function closeToast(button) {
+            const toast = button.closest('.toast-message');
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(100%)';
+            setTimeout(() => {
+                toast.remove();
+            }, 300);
+        }
+
+        // Auto close toasts after 5 seconds
+        document.addEventListener('DOMContentLoaded', function() {
+            const toasts = document.querySelectorAll('.toast-message');
+            toasts.forEach(toast => {
+                setTimeout(() => {
+                    if (toast.parentNode) {
+                        const closeButton = toast.querySelector('.toast-close');
+                        if (closeButton) {
+                            closeToast(closeButton);
+                        }
+                    }
+                }, 5000);
+            });
+        });
+    </script>
+
 </body>
 </html>
