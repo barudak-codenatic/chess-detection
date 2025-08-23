@@ -306,45 +306,49 @@
                     </div>
                     
                     <!-- Camera Feed Display -->
-                    <div class="relative">
-                        <video id="camera-feed" class="w-full rounded-lg hidden" autoplay style="max-height: 400px; object-fit: cover;"></video>
-                        <canvas id="detection-canvas" class="w-full rounded-lg hidden border-2 border-green-500" style="max-height: 400px;"></canvas>
-                        <div id="camera-placeholder" class="camera-placeholder">
-                            <div class="text-center">
-                                <i class="fas fa-camera fa-4x text-amber-400 mb-4"></i>
-                                <p class="text-amber-600 font-medium">Camera will appear here</p>
-                                <p class="text-amber-500 text-sm">Allow camera access when prompted</p>
+                    <div class="mt-6">
+                        <div class="bg-amber-100 border-2 border-amber-300 rounded-xl p-6 text-center">
+                            <i class="fas fa-desktop fa-3x text-amber-600 mb-4"></i>
+                            <h3 class="text-lg font-bold text-amber-800 mb-2">OpenCV Detection Window</h3>
+                            <p class="text-amber-700 mb-4">Detection will open in a separate OpenCV window with real-time processing.</p>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                                <div class="bg-white rounded-lg p-3">
+                                    <strong class="text-amber-800">Controls:</strong><br>
+                                    <span class="text-amber-600">Press 'q' to quit<br>Space to toggle bbox<br>'m' to toggle mode</span>
+                                </div>
+                                <div class="bg-white rounded-lg p-3">
+                                    <strong class="text-amber-800">Features:</strong><br>
+                                    <span class="text-amber-600">Real-time detection<br>720x720 crop<br>CLAHE preprocessing</span>
+                                </div>
+                                <div class="bg-white rounded-lg p-3">
+                                    <strong class="text-amber-800">Settings:</strong><br>
+                                    <span class="text-amber-600">Auto-sync with web<br>Live configuration<br>WebSocket updates</span>
+                                </div>
                             </div>
                         </div>
                     </div>
                     
                     <!-- Control Buttons -->
-                    <div class="mt-6 grid grid-cols-2 lg:grid-cols-5 gap-3">
-                        <button 
-                            class="btn-elegant bg-green-600 hover:bg-green-700 text-white py-3 px-4 rounded-lg font-medium transition-all duration-200 flex items-center justify-center"
-                            onclick="startCamera()">
-                            <i class="fas fa-video mr-2"></i>Start Camera
-                        </button>
+                    <div class="mt-6 grid grid-cols-2 lg:grid-cols-4 gap-3">
                         <button 
                             class="btn-elegant bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg font-medium transition-all duration-200 flex items-center justify-center"
                             onclick="startDetection()">
-                            <i class="fas fa-search mr-2"></i>Detect
-                        </button>
-                        <button 
-                            class="btn-elegant bg-yellow-600 hover:bg-yellow-700 text-white py-3 px-4 rounded-lg font-medium transition-all duration-200 flex items-center justify-center"
-                            onclick="pauseDetection()">
-                            <i class="fas fa-pause mr-2"></i>Pause
+                            <i class="fas fa-external-link-alt mr-2"></i>Start OpenCV
                         </button>
                         <button 
                             class="btn-elegant bg-red-600 hover:bg-red-700 text-white py-3 px-4 rounded-lg font-medium transition-all duration-200 flex items-center justify-center"
-                            onclick="stopCamera()">
-                            <i class="fas fa-stop mr-2"></i>Stop
+                            onclick="pauseDetection()">
+                            <i class="fas fa-stop mr-2"></i>Stop OpenCV
                         </button>
-                        <!-- Temporary test button -->
+                        <button 
+                            class="btn-elegant bg-green-600 hover:bg-green-700 text-white py-3 px-4 rounded-lg font-medium transition-all duration-200 flex items-center justify-center"
+                            onclick="toggleFullscreen()">
+                            <i class="fas fa-expand mr-2"></i>Fullscreen
+                        </button>
                         <button 
                             class="btn-elegant bg-purple-600 hover:bg-purple-700 text-white py-3 px-4 rounded-lg font-medium transition-all duration-200 flex items-center justify-center"
                             onclick="testDetection()">
-                            <i class="fas fa-bug mr-2"></i>Test
+                            <i class="fas fa-bug mr-2"></i>Test API
                         </button>
                     </div>
                 </div>
@@ -581,80 +585,61 @@
 
         // Start detection
         function startDetection() {
-            if (!videoStream) {
-                alert('Please start camera first');
+            const cameraSelect = document.getElementById('camera-select');
+            const deviceId = cameraSelect.value;
+            
+            if (!deviceId) {
+                alert('Please select a camera first');
                 return;
             }
             
-            const video = document.getElementById('camera-feed');
-            if (video.readyState !== 4) {
-                alert('Please wait for camera to fully load');
+            // Get camera index from device list
+            const cameraIndex = Array.from(cameraSelect.options).findIndex(option => option.value === deviceId) - 1;
+            
+            if (cameraIndex < 0) {
+                alert('Invalid camera selection');
                 return;
             }
             
-            isDetecting = true;
-            const canvas = document.getElementById('detection-canvas');
-            const ctx = canvas.getContext('2d');
+            // Get detection settings
+            const mode = document.querySelector('input[name="detection-mode"]:checked').value;
+            const showBbox = document.getElementById('show-bbox').checked;
             
-            canvas.width = 720;
-            canvas.height = 720;
-            canvas.classList.remove('hidden');
-            video.classList.add('hidden'); // Hide video, show canvas
+            logAction(`Starting OpenCV detection with Camera ${cameraIndex}, Mode: ${mode}, BBox: ${showBbox}`);
             
-            logAction('Starting chess piece detection...');
+            // Send via Socket.IO for real-time updates
+            socket.emit('start_opencv_detection', {
+                camera_index: cameraIndex,
+                mode: mode,
+                show_bbox: showBbox
+            });
             
-            detectionInterval = setInterval(async () => {
-                if (!isDetecting || !videoStream) return;
-                
-                try {
-                    // Draw video frame to canvas first
-                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    const imageData = canvas.toDataURL('image/jpeg', 0.8);
-                    
-                    // Get detection mode and settings
-                    const mode = document.querySelector('input[name="detection-mode"]:checked').value;
-                    const showBbox = document.getElementById('show-bbox').checked;
-                    
-                    const response = await fetch('/api/detect', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            image: imageData,
-                            mode: mode,
-                            show_bbox: showBbox
-                        })
-                    });
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    
-                    const result = await response.json();
-                    
-                    // Display result on canvas
-                    if (result.image) {
-                        const img = new Image();
-                        img.onload = () => {
-                            ctx.clearRect(0, 0, canvas.width, canvas.height);
-                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                        };
-                        img.src = result.image;
-                        
-                        // Log detections occasionally to avoid spam
-                        if (result.detections && result.detections.length > 0 && Math.random() < 0.1) {
-                            logAction(`Detected ${result.piece_count} pieces: ${result.detections.map(d => d.class_name).join(', ')}`);
-                        }
-                    }
-                    
-                } catch (error) {
-                    console.error('Detection error:', error);
-                    logAction('Detection error: ' + error.message);
+            // Also update via HTTP API
+            fetch('/api/start_opencv_detection', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    camera_index: cameraIndex,
+                    mode: mode,
+                    show_bbox: showBbox
+                })
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.status === 'success') {
+                    logAction('OpenCV detection started successfully');
+                    updateDetectionButtons(true);
+                } else {
+                    logAction('Error starting detection: ' + result.error);
+                    alert('Error starting detection: ' + result.error);
                 }
-            }, 200); // 5 FPS
-            
-            logAction('Chess piece detection started (5 FPS)');
+            })
+            .catch(error => {
+                logAction('Error starting detection: ' + error.message);
+                console.error('Error starting detection:', error);
+            });
         }
 
         // Stop camera
@@ -817,6 +802,136 @@
         window.addEventListener('beforeunload', function() {
             stopCamera();
         });
+
+        // Update pauseDetection to stop OpenCV
+        function pauseDetection() {
+            logAction('Stopping OpenCV detection...');
+            
+            socket.emit('stop_opencv_detection');
+            
+            fetch('/api/stop_opencv_detection', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.status === 'success') {
+                    logAction('OpenCV detection stopped');
+                    updateDetectionButtons(false);
+                } else {
+                    logAction('Error stopping detection: ' + result.error);
+                }
+            })
+            .catch(error => {
+                logAction('Error stopping detection: ' + error.message);
+                console.error('Error stopping detection:', error);
+            });
+        }
+
+        // New function to update detection settings in real-time
+        function updateDetectionSettings() {
+            const cameraSelect = document.getElementById('camera-select');
+            const deviceId = cameraSelect.value;
+            const cameraIndex = Array.from(cameraSelect.options).findIndex(option => option.value === deviceId) - 1;
+            const mode = document.querySelector('input[name="detection-mode"]:checked').value;
+            const showBbox = document.getElementById('show-bbox').checked;
+            
+            if (cameraIndex >= 0) {
+                socket.emit('update_detection_config', {
+                    camera_index: cameraIndex,
+                    mode: mode,
+                    show_bbox: showBbox
+                });
+                
+                logAction(`Updated settings - Camera: ${cameraIndex}, Mode: ${mode}, BBox: ${showBbox}`);
+            }
+        }
+
+        // Function to update button states
+        function updateDetectionButtons(isActive) {
+            const startBtn = document.querySelector('button[onclick="startDetection()"]');
+            const stopBtn = document.querySelector('button[onclick="pauseDetection()"]');
+            
+            if (isActive) {
+                startBtn.disabled = true;
+                startBtn.classList.add('opacity-50');
+                stopBtn.disabled = false;
+                stopBtn.classList.remove('opacity-50');
+            } else {
+                startBtn.disabled = false;
+                startBtn.classList.remove('opacity-50');
+                stopBtn.disabled = true;
+                stopBtn.classList.add('opacity-50');
+            }
+        }
+
+        // Add event listeners for real-time settings update
+        document.addEventListener('DOMContentLoaded', function() {
+            // Update settings when camera selection changes
+            document.getElementById('camera-select').addEventListener('change', updateDetectionSettings);
+            
+            // Update settings when detection mode changes
+            document.querySelectorAll('input[name="detection-mode"]').forEach(radio => {
+                radio.addEventListener('change', updateDetectionSettings);
+            });
+            
+            // Update settings when bounding box toggle changes
+            document.getElementById('show-bbox').addEventListener('change', updateDetectionSettings);
+            
+            // Check detection status on page load
+            fetch('/api/detection_status')
+                .then(response => response.json())
+                .then(data => {
+                    updateDetectionButtons(data.is_active);
+                    if (data.is_active) {
+                        logAction(`Detection already running - Camera: ${data.camera_index}, Mode: ${data.mode}`);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking detection status:', error);
+                });
+        });
+
+        // Socket.IO listeners for OpenCV detection
+        socket.on('opencv_detection_started', function(data) {
+            logAction(`OpenCV detection started - Camera: ${data.camera_index}, Mode: ${data.mode}, BBox: ${data.show_bbox}`);
+            updateDetectionButtons(true);
+        });
+
+        socket.on('opencv_detection_stopped', function() {
+            logAction('OpenCV detection stopped');
+            updateDetectionButtons(false);
+        });
+
+        socket.on('detection_config_updated', function(data) {
+            logAction(`Detection settings updated - Camera: ${data.camera_index}, Mode: ${data.mode}, BBox: ${data.show_bbox}`);
+        });
+
+        socket.on('error', function(data) {
+            logAction('Error: ' + data.message);
+            alert('Error: ' + data.message);
+        });
+
+        // Remove the old browser-based detection functions
+        // (Remove startCamera, video handling, canvas drawing functions)
+
+        // Update the control buttons text
+        function updateControlButtonsText() {
+            const startBtn = document.querySelector('button[onclick="startDetection()"]');
+            const stopBtn = document.querySelector('button[onclick="pauseDetection()"]');
+            
+            if (startBtn) {
+                startBtn.innerHTML = '<i class="fas fa-external-link-alt mr-2"></i>Start OpenCV';
+            }
+            if (stopBtn) {
+                stopBtn.innerHTML = '<i class="fas fa-stop mr-2"></i>Stop OpenCV';
+            }
+        }
+
+        // Call on page load
+        document.addEventListener('DOMContentLoaded', updateControlButtonsText);
     </script>
 </body>
 </html>

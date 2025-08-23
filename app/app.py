@@ -4,6 +4,7 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 from config import Config
 from models import db, bcrypt, User, GameSession, Match
 from routes import init_routes
+from chess_detection import ChessDetectionService
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -103,6 +104,60 @@ def on_admin_control(data):
             'initial_time': match.initial_time,   # Tambahkan info waktu awal
             'increment': match.increment          # Tambahkan info increment
         }, room=f"match_{match_id}")
+detection_service = ChessDetectionService()
+
+@socketio.on('update_detection_config')
+def on_update_detection_config(data):
+    try:
+        camera_index = data.get('camera_index')
+        mode = data.get('mode')
+        show_bbox = data.get('show_bbox')
+        
+        # Update detection settings
+        detection_service.update_detection_settings(
+            camera_index=int(camera_index) if camera_index is not None else None,
+            mode=mode,
+            show_bbox=show_bbox
+        )
+        
+        # Broadcast update to all clients
+        socketio.emit('detection_config_updated', {
+            'camera_index': detection_service.camera_index,
+            'mode': detection_service.detection_mode,
+            'show_bbox': detection_service.show_bbox
+        })
+        
+    except Exception as e:
+        emit('error', {'message': f'Error updating detection config: {str(e)}'})
+
+@socketio.on('start_opencv_detection')
+def on_start_opencv_detection(data):
+    try:
+        camera_index = int(data.get('camera_index', 0))
+        mode = data.get('mode', 'raw')
+        show_bbox = data.get('show_bbox', True)
+        
+        success = detection_service.start_opencv_detection(camera_index, mode, show_bbox)
+        
+        if success:
+            socketio.emit('opencv_detection_started', {
+                'camera_index': camera_index,
+                'mode': mode,
+                'show_bbox': show_bbox
+            })
+        else:
+            emit('error', {'message': 'Failed to start OpenCV detection'})
+            
+    except Exception as e:
+        emit('error', {'message': f'Error starting detection: {str(e)}'})
+
+@socketio.on('stop_opencv_detection')
+def on_stop_opencv_detection():
+    try:
+        detection_service.stop_opencv_detection()
+        socketio.emit('opencv_detection_stopped')
+    except Exception as e:
+        emit('error', {'message': f'Error stopping detection: {str(e)}'})
 
 if __name__ == '__main__':
     socketio.run(app, debug=True)

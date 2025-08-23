@@ -210,3 +210,86 @@ def init_routes(app, login_manager):
             
         except Exception as e:
             return jsonify({'error': f'Detection service error: {str(e)}'}), 500
+
+    @app.route('/api/start_opencv_detection', methods=['POST'])
+    @login_required
+    def start_opencv_detection():
+        if current_user.role != 'admin':
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        try:
+            data = request.get_json()
+            camera_index = int(data.get('camera_index', 0))
+            mode = data.get('mode', 'raw')
+            show_bbox = data.get('show_bbox', True)
+            
+            # Start OpenCV detection
+            success = detection_service.start_opencv_detection(camera_index, mode, show_bbox)
+            
+            if success:
+                return jsonify({
+                    'status': 'success',
+                    'message': 'OpenCV detection started',
+                    'camera_index': camera_index,
+                    'mode': mode,
+                    'show_bbox': show_bbox
+                })
+            else:
+                return jsonify({'error': 'Failed to start detection'}), 500
+                
+        except Exception as e:
+            return jsonify({'error': f'Detection service error: {str(e)}'}), 500
+
+    @app.route('/api/stop_opencv_detection', methods=['POST'])
+    @login_required
+    def stop_opencv_detection():
+        if current_user.role != 'admin':
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        try:
+            detection_service.stop_opencv_detection()
+            return jsonify({
+                'status': 'success',
+                'message': 'OpenCV detection stopped'
+            })
+        except Exception as e:
+            return jsonify({'error': f'Error stopping detection: {str(e)}'}), 500
+
+    @app.route('/api/update_detection_settings', methods=['POST'])
+    @login_required
+    def update_detection_settings():
+        if current_user.role != 'admin':
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        try:
+            data = request.get_json()
+            camera_index = data.get('camera_index')
+            mode = data.get('mode')
+            show_bbox = data.get('show_bbox')
+            
+            detection_service.update_detection_settings(
+                camera_index=int(camera_index) if camera_index is not None else None,
+                mode=mode,
+                show_bbox=show_bbox
+            )
+            
+            return jsonify({
+                'status': 'success',
+                'message': 'Detection settings updated'
+            })
+        except Exception as e:
+            return jsonify({'error': f'Error updating settings: {str(e)}'}), 500
+
+    @app.route('/api/detection_status', methods=['GET'])
+    @login_required
+    def detection_status():
+        if current_user.role != 'admin':
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        return jsonify({
+            'is_active': detection_service.is_detection_active(),
+            'camera_index': detection_service.camera_index,
+            'mode': detection_service.detection_mode,
+            'show_bbox': detection_service.show_bbox
+        })
+
