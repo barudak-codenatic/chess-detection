@@ -18,7 +18,7 @@ login_manager.login_view = 'login'
 
 with app.app_context():
     # Drop semua tabel dan buat ulang
-    db.drop_all()
+    # db.drop_all()
     db.create_all()
     
     # Tambahkan user admin jika belum ada

@@ -5,6 +5,7 @@ import threading
 import time
 from scipy import ndimage
 from sklearn.cluster import DBSCAN
+from chess_analysis import ChessAnalysisService
 
 class ChessDetectionService:
     def __init__(self, model_path='app/model/best.pt'):
@@ -23,6 +24,8 @@ class ChessDetectionService:
         self.cap = None
         self.fps_counter = 0
         self.last_fps_time = time.time()
+        self.analysis_service = ChessAnalysisService(stockfish_path="./stockfish.exe")
+        self.last_fen_for_analysis = None
         
         # Board detection attributes
         self.board_corners = None
@@ -267,18 +270,18 @@ class ChessDetectionService:
             return None
 
     def generate_grid_coordinates(self, size=720):
-        """Generate chess square coordinates"""
+        """Generate chess square coordinates - a1 at top-left"""
         try:
             coords = {}
             files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
-            ranks = ['8', '7', '6', '5', '4', '3', '2', '1']
+            ranks = ['1', '2', '3', '4', '5', '6', '7', '8']  # Dari atas ke bawah (rank 1 ke rank 8)
 
             square_size = size // 8
 
-            for i in range(8):
-                for j in range(8):
-                    file_name = files[j]
-                    rank_name = ranks[i]
+            for i in range(8):  # Baris (ranks)
+                for j in range(8):  # Kolom (files)
+                    file_name = files[i]
+                    rank_name = ranks[j]
                     square_name = file_name + rank_name
 
                     x = j * square_size + square_size // 2
@@ -351,11 +354,11 @@ class ChessDetectionService:
 
                 # Draw square labels pada flattened board
                 files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
-                ranks = ['1', '2', '6', '5', '4', '3', '2', '1']
+                ranks = ['1', '2', '3', '4', '5', '6', '7', '8']  # Urutan dari atas ke bawah
 
                 for i in range(8):
                     for j in range(8):
-                        square_name = files[j] + ranks[i]
+                        square_name = files[i] + ranks[j]
                         if square_name in grid_coords:
                             x, y = grid_coords[square_name]
                             cv2.putText(overlay_image, square_name, (x-15, y+5), 
@@ -435,6 +438,30 @@ class ChessDetectionService:
         
         return True
     
+    def _start_analysis_window(self):
+        """Start chess analysis window"""
+        try:
+            if not self.analysis_service.is_analysis_active():
+                initial_fen = getattr(self, 'last_fen', None)
+                if self.analysis_service.start_analysis(initial_fen):
+                    print("Chess analysis window started")
+                    self.last_fen_for_analysis = initial_fen
+                else:
+                    print("Failed to start chess analysis window")
+            else:
+                print("Chess analysis window already running")
+        except Exception as e:
+            print(f"Error starting analysis window: {e}")
+
+    def _stop_analysis_window(self):
+        """Stop chess analysis window"""
+        try:
+            if self.analysis_service.is_analysis_active():
+                self.analysis_service.stop_analysis()
+                print("Chess analysis window stopped")
+        except Exception as e:
+            print(f"Error stopping analysis window: {e}")
+    
     def _detection_loop(self):
         """Main detection loop running in separate thread"""
         try:
@@ -486,17 +513,17 @@ class ChessDetectionService:
                 print(f"Warning: Could not set camera properties: {e}")
             
             # Get actual camera properties
-            actual_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-            actual_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            actual_fps = self.cap.get(cv2.CAP_PROP_FPS)
+            # actual_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            # actual_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            # actual_fps = self.cap.get(cv2.CAP_PROP_FPS)
             
-            print(f"Camera {self.camera_index} opened successfully")
-            print(f"Resolution: {actual_width}x{actual_height}")
-            print(f"FPS: {actual_fps}")
-            print(f"Detection mode: {self.detection_mode}")
-            print(f"Show bounding boxes: {self.show_bbox}")
-            print(f"Show board grid: {self.show_board_grid}")
-            print("Controls: 'q' to quit, 'space' to toggle bbox, 'm' to toggle mode, 'g' to toggle grid, 'b' to toggle board detection")
+            # print(f"Camera {self.camera_index} opened successfully")
+            # print(f"Resolution: {actual_width}x{actual_height}")
+            # print(f"FPS: {actual_fps}")
+            # print(f"Detection mode: {self.detection_mode}")
+            # print(f"Show bounding boxes: {self.show_bbox}")
+            # print(f"Show board grid: {self.show_board_grid}")
+            # print("Controls: 'q' to quit, 'space' to toggle bbox, 'm' to toggle mode, 'g' to toggle grid, 'b' to toggle board detection")
             
             # Create window
             cv2.namedWindow('Chess Detection - ChessMon', cv2.WINDOW_NORMAL)
@@ -590,6 +617,13 @@ class ChessDetectionService:
                         self.cap.release()
                         time.sleep(0.5)
                         self.cap = cv2.VideoCapture(self.camera_index, cv2.CAP_DSHOW)
+                    # Analysis controls
+                    elif key == ord('a'):  # Start analysis
+                        self._start_analysis_window()
+                    elif key == ord('s'):  # Stop analysis  
+                        self._stop_analysis_window()
+                    elif key == ord('u'):  # Update FEN to analysis
+                        self._update_analysis_fen()
                 except Exception as e:
                     print(f"Key handling error: {e}")
                 
@@ -603,6 +637,7 @@ class ChessDetectionService:
         except Exception as e:
             print(f"Detection loop error: {e}")
         finally:
+            self._stop_analysis_window()
             # Cleanup
             try:
                 if self.cap and self.cap.isOpened():
@@ -613,9 +648,27 @@ class ChessDetectionService:
             
             self.detection_active = False
             print("Detection stopped")
+
+    def _update_analysis_fen(self):
+        """Update FEN in analysis window"""
+        try:
+            if hasattr(self, 'last_fen') and self.last_fen:
+                if self.analysis_service.is_analysis_active():
+                    if self.analysis_service.update_fen(self.last_fen):
+                        print(f"Analysis updated with new FEN: {self.last_fen[:30]}...")
+                        self.last_fen_for_analysis = self.last_fen
+                    else:
+                        print("Failed to update FEN in analysis")
+                else:
+                    print("Analysis window not active. Starting analysis with current FEN...")
+                    self._start_analysis_window()
+            else:
+                print("No FEN available to update analysis")
+        except Exception as e:
+            print(f"Error updating analysis FEN: {e}")
     
     def _add_info_overlay(self, frame):
-        """Add information overlay to frame"""
+        """Add information overlay to frame including FEN and analysis button"""
         try:
             if frame is None:
                 return frame
@@ -631,9 +684,9 @@ class ChessDetectionService:
                 fps = 0
             self.last_fps_time = current_time
             
-            # Background for text
+            # Background for text (increased size for analysis info)
             overlay = display_frame.copy()
-            cv2.rectangle(overlay, (10, 10), (450, 200), (0, 0, 0), -1)
+            cv2.rectangle(overlay, (10, 10), (700, 280), (0, 0, 0), -1)
             cv2.addWeighted(overlay, 0.7, display_frame, 0.3, 0, display_frame)
             
             # Add text information
@@ -655,9 +708,27 @@ class ChessDetectionService:
             
             cv2.putText(display_frame, f"FPS: {fps:.1f}", (20, 150), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
-            cv2.putText(display_frame, "Q:quit | Space:bbox | M:mode | G:grid | B:board | R:reset", (20, 170), 
+            
+            # Display last FEN if available
+            if hasattr(self, 'last_fen') and self.last_fen:
+                fen_display = self.last_fen[:50] + "..." if len(self.last_fen) > 50 else self.last_fen
+                cv2.putText(display_frame, f"FEN: {fen_display}", (20, 170), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 0), 1)
+            else:
+                cv2.putText(display_frame, "FEN: Not available", (20, 170), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.4, (128, 128, 128), 1)
+            
+            # Analysis status
+            analysis_status = "ACTIVE" if self.analysis_service.is_analysis_active() else "STOPPED"
+            analysis_color = (0, 255, 0) if self.analysis_service.is_analysis_active() else (128, 128, 128)
+            cv2.putText(display_frame, f"Analysis: {analysis_status}", (20, 190), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.4, analysis_color, 1)
+            
+            cv2.putText(display_frame, "Q:quit | Space:bbox | M:mode | G:grid | B:board | R:reset", (20, 210), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 255, 255), 1)
-            cv2.putText(display_frame, f"Frame: {self.fps_counter}", (20, 190), 
+            cv2.putText(display_frame, "A:start analysis | S:stop analysis | U:update FEN", (20, 230), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 255, 255), 1)
+            cv2.putText(display_frame, f"Frame: {self.fps_counter}", (20, 250), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 255), 1)
             
             return display_frame
@@ -670,7 +741,7 @@ class ChessDetectionService:
         """Stop real-time detection"""
         print("Stopping detection...")
         self.detection_active = False
-        
+        self._stop_analysis_window()
         if self.detection_thread and self.detection_thread.is_alive():
             self.detection_thread.join(timeout=5)
         
@@ -703,7 +774,7 @@ class ChessDetectionService:
         return self.detection_active
     
     def detect_pieces_realtime(self, image):
-        """Enhanced detect pieces with board detection integration"""
+        """Enhanced detect pieces with board detection integration and FEN generation"""
         if self.model is None or image is None:
             return image
             
@@ -745,6 +816,15 @@ class ChessDetectionService:
                     else:
                         display_image = processed_image
                     self.last_piece_results = results[0]
+                    
+                    # Generate FEN every 30 frames (less frequent)
+                    if self.fps_counter % 30 == 0 and board_grid_coords is not None:
+                        fen_code = self.generate_fen_from_detection(
+                            results[0], board_corners, board_grid_coords, 
+                            use_transformed_coords=True
+                        )
+                        if fen_code:
+                            self.last_fen = fen_code
                 else:
                     display_image = processed_image
                     self.last_piece_results = None
@@ -869,17 +949,17 @@ class ChessDetectionService:
     
     # Enhanced web API methods
     def detect_pieces(self, image, mode='raw', show_bbox=True, show_board_grid=True, use_flattened=True):
-        """Enhanced detect pieces for web API with board detection"""
+        """Enhanced detect pieces for web API with board detection and FEN generation"""
         if self.model is None:
             print("YOLO model not loaded")
-            return image, None, None, None
+            return image, None, None, None, None
             
         try:
             input_image = image.copy()
             processed_image = self.crop_to_square(input_image, 720)
             
             if processed_image is None:
-                return image, None, None, None
+                return image, None, None, None, None
             
             if mode == 'clahe':
                 processed_image = self.apply_clahe(processed_image)
@@ -891,8 +971,17 @@ class ChessDetectionService:
             results = self.model(processed_image, verbose=False)
             
             piece_results = None
+            fen_code = None
+            
             if len(results) > 0 and results[0].boxes is not None and len(results[0].boxes) > 0:
                 piece_results = results[0]
+                
+                # Generate FEN if we have both pieces and board
+                if grid_coords is not None:
+                    fen_code = self.generate_fen_from_detection(
+                        piece_results, board_corners, grid_coords,
+                        use_transformed_coords=True
+                    )
             
             # Tentukan final image berdasarkan mode
             if use_flattened and show_board_grid and flattened_board is not None and grid_coords is not None:
@@ -923,11 +1012,11 @@ class ChessDetectionService:
                         flattened_board, use_flattened=False
                     )
             
-            return final_image, piece_results, board_corners, grid_coords
+            return final_image, piece_results, board_corners, grid_coords, fen_code
                 
         except Exception as e:
             print(f"Web detection error: {e}")
-            return image, None, None, None
+            return image, None, None, None, None
     
     def get_detection_data(self, results):
         """Extract detection data from YOLO results"""
@@ -958,3 +1047,237 @@ class ChessDetectionService:
             'squares_detected': len(grid_coords) if grid_coords is not None else 0
         }
         return board_data
+    def get_board_data(self, corners, grid_coords):
+        """Extract board detection data"""
+        board_data = {
+            'corners_detected': corners is not None,
+            'corners': corners.tolist() if corners is not None else None,
+            'grid_coordinates': grid_coords if grid_coords is not None else {},
+            'squares_detected': len(grid_coords) if grid_coords is not None else 0
+        }
+        return board_data
+
+    # ========== FEN GENERATION METHODS ==========
+    
+    def _map_class_to_fen_piece(self, class_name):
+        """Map YOLO class names to FEN notation"""
+        piece_mapping = {
+            # White pieces (uppercase)
+            'white_king': 'K',
+            'white_queen': 'Q', 
+            'white_rook': 'R',
+            'white_bishop': 'B',
+            'white_knight': 'N',
+            'white_pawn': 'P',
+            
+            # Black pieces (lowercase)
+            'black_king': 'k',
+            'black_queen': 'q',
+            'black_rook': 'r', 
+            'black_bishop': 'b',
+            'black_knight': 'n',
+            'black_pawn': 'p'
+        }
+        
+        # Normalize class name (handle variations)
+        normalized_name = class_name.lower().replace('_', ' ').replace('-', ' ')
+        
+        # Try exact match first
+        if class_name in piece_mapping:
+            return piece_mapping[class_name]
+        
+        # Try partial matching
+        for key, value in piece_mapping.items():
+            if key.replace('_', ' ') in normalized_name:
+                return value
+        
+        # Default fallback
+        print(f"Warning: Unknown piece class '{class_name}', defaulting to 'P'")
+        return 'P'
+
+    def _get_square_from_coordinates(self, x, y, grid_coords):
+        """Get chess square notation from pixel coordinates"""
+        if not grid_coords:
+            return None
+            
+        min_distance = float('inf')
+        closest_square = None
+        
+        for square, (sq_x, sq_y) in grid_coords.items():
+            distance = np.sqrt((x - sq_x)**2 + (y - sq_y)**2)
+            if distance < min_distance:
+                min_distance = distance
+                closest_square = square
+        
+        # Only return if reasonably close (within half a square)
+        square_size = 720 // 8  # 90 pixels per square
+        if min_distance < square_size // 2:
+            return closest_square
+        return None
+
+    def _resolve_duplicate_pieces(self, pieces_on_board):
+        """Resolve multiple pieces on same square by keeping highest confidence"""
+        resolved_board = {}
+        
+        for square, pieces in pieces_on_board.items():
+            if len(pieces) == 1:
+                resolved_board[square] = pieces[0]['fen_piece']
+            else:
+                # Multiple pieces on same square - keep highest confidence
+                best_piece = max(pieces, key=lambda p: p['confidence'])
+                resolved_board[square] = best_piece['fen_piece']
+                
+                # print(f"Warning: Multiple pieces detected on {square}, keeping {best_piece['fen_piece']} (conf: {best_piece['confidence']:.2f})")
+        
+        return resolved_board
+
+    def _board_to_fen(self, board_dict):
+        """Convert board dictionary to FEN notation - flip board vertically"""
+        # Initialize empty 8x8 board
+        board = [['.' for _ in range(8)] for _ in range(8)]
+        
+        # Place pieces on board (menggunakan koordinat asli)
+        for square, piece in board_dict.items():
+            if len(square) == 2:
+                file = ord(square[0]) - ord('a')  # a-h -> 0-7 (kolom)
+                rank = int(square[1]) - 1         # 1-8 -> 0-7 (baris)
+                
+                if 0 <= file < 8 and 0 <= rank < 8:
+                    board[rank][file] = piece
+        
+        # Convert board to FEN string dengan flip vertikal
+        # FEN expects rank 8 first (top), rank 1 last (bottom)
+        # Tapi sistem kita rank 1 di atas, jadi perlu diflip
+        fen_rows = []
+        
+        # Flip board: rank 1 (index 0) menjadi rank 8 dalam FEN
+        for i in range(7, -1, -1):  # Dari rank 8 ke rank 1 (flip vertikal)
+            fen_row = ""
+            empty_count = 0
+            
+            for j in range(8):  # Dari file a ke file h (kiri ke kanan)
+                cell = board[i][j]
+                if cell == '.':
+                    empty_count += 1
+                else:
+                    if empty_count > 0:
+                        fen_row += str(empty_count)
+                        empty_count = 0
+                    fen_row += cell
+            
+            if empty_count > 0:
+                fen_row += str(empty_count)
+            
+            fen_rows.append(fen_row)
+        
+        return '/'.join(fen_rows)
+
+    def generate_fen_from_detection(self, piece_results, board_corners, grid_coords, use_transformed_coords=True):
+        """Generate FEN notation from piece detection results"""
+        try:
+            if piece_results is None or grid_coords is None:
+                print("Cannot generate FEN: Missing piece results or grid coordinates")
+                return None
+            
+            pieces_on_board = {}
+            
+            # Process each detected piece
+            for box in piece_results.boxes:
+                confidence = float(box.conf[0])
+                class_id = int(box.cls[0])
+                class_name = self.model.names[class_id] if hasattr(self.model, 'names') else f"Class_{class_id}"
+                
+                # Get bounding box center
+                x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                center_x = (x1 + x2) / 2
+                center_y = (y1 + y2) / 2
+                
+                # Transform coordinates if using flattened board
+                if use_transformed_coords and board_corners is not None:
+                    try:
+                        # Create homography matrix
+                        rect = np.zeros((4, 2), dtype=np.float32)
+                        s = board_corners.sum(axis=1)
+                        rect[0] = board_corners[np.argmin(s)]  # top-left
+                        rect[2] = board_corners[np.argmax(s)]  # bottom-right
+
+                        diff = np.diff(board_corners, axis=1)
+                        rect[1] = board_corners[np.argmin(diff)]  # top-right
+                        rect[3] = board_corners[np.argmax(diff)]  # bottom-left
+
+                        dst = np.array([[0, 0], [720, 0], [720, 720], [0, 720]], dtype=np.float32)
+                        M = cv2.getPerspectiveTransform(rect, dst)
+                        
+                        # Transform center point
+                        center_point = np.array([[[center_x, center_y]]], dtype=np.float32)
+                        transformed_point = cv2.perspectiveTransform(center_point, M)
+                        center_x, center_y = transformed_point[0][0]
+                        
+                    except Exception as e:
+                        print(f"Coordinate transformation error: {e}")
+                        continue
+                
+                # Get chess square from coordinates
+                square = self._get_square_from_coordinates(center_x, center_y, grid_coords)
+                
+                if square:
+                    # Convert class name to FEN piece
+                    fen_piece = self._map_class_to_fen_piece(class_name)
+                    
+                    # Store piece info (handle multiple pieces per square)
+                    if square not in pieces_on_board:
+                        pieces_on_board[square] = []
+                    
+                    pieces_on_board[square].append({
+                        'fen_piece': fen_piece,
+                        'confidence': confidence,
+                        'class_name': class_name,
+                        'coords': (center_x, center_y)
+                    })
+                    
+                    # print(f"Detected {class_name} ({fen_piece}) on {square} with confidence {confidence:.2f}")
+            
+            # Resolve duplicates (multiple pieces on same square)
+            resolved_board = self._resolve_duplicate_pieces(pieces_on_board)
+            
+            # Generate FEN string
+            fen_position = self._board_to_fen(resolved_board)
+            
+            # Add basic FEN metadata (can be enhanced later)
+            # Format: position active_color castling en_passant halfmove fullmove
+            full_fen = f"{fen_position} w - - 0 1"
+            
+            # print(f"\n=== FEN GENERATION RESULT ===")
+            # print(f"Detected {len(resolved_board)} pieces")
+            # print(f"FEN: {full_fen}")
+            # print(f"Board layout:")
+            # self._print_board_layout(resolved_board)
+            
+            return full_fen
+            
+        except Exception as e:
+            print(f"FEN generation error: {e}")
+            return None
+
+    def _print_board_layout(self, board_dict):
+        """Print visual board layout for debugging - menampilkan seperti FEN standar"""
+        try:
+            # Create visual board representation
+            board = [['.' for _ in range(8)] for _ in range(8)]
+            
+            for square, piece in board_dict.items():
+                if len(square) == 2:
+                    file = ord(square[0]) - ord('a')  # a-h -> 0-7 (kolom)
+                    rank = int(square[1]) - 1         # 1-8 -> 0-7 (baris)
+                    
+                    if 0 <= file < 8 and 0 <= rank < 8:
+                        board[rank][file] = piece
+            
+            print("  a b c d e f g h")
+            # Print dari rank 8 ke rank 1 (standar catur)
+            for i in range(7, -1, -1):
+                rank_number = i + 1
+                print(f"{rank_number} {' '.join(board[i])}")
+            
+        except Exception as e:
+            print(f"Board layout print error: {e}")
