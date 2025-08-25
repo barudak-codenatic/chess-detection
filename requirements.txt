@@ -10,3 +10,7 @@ cryptography
 Flask-SocketIO
 python-socketio
 ultralytics
+python-chess
+pygame
+scikit-learn
+scipy
