@@ -159,160 +159,344 @@
         </div>
     </div>
 
-    <script>
-        // Socket.IO Connection - Jinja2 Template Variables
-        const socket = io();
-        // These are Jinja2 template variables, not JavaScript syntax
-        const matchId = parseInt('{{ match.id }}');
-        let currentPlayer = parseInt('{{ session.current_player }}');
-        let isActive = ('{{ session.is_active }}' === 'True');
-        let player1Time = parseInt('{{ session.player1_time }}');
-        let player2Time = parseInt('{{ session.player2_time }}');
-        let timerInterval;
+    
 
-        // Join match room
-        socket.emit('join_match', {match_id: matchId});
+    // Ganti seluruh bagian script dengan ini:
+<script>
+    // Socket.IO Connection - Jinja2 Template Variables
+    const socket = io();
+    const matchId = parseInt('{{ match.id }}');
+    let currentPlayer = parseInt('{{ session.current_player }}');
+    let isActive = ('{{ session.is_active }}' === 'True');
+    let player1Time = parseInt('{{ session.player1_time }}');
+    let player2Time = parseInt('{{ session.player2_time }}');
+    let timerInterval;
 
-        // Format time untuk display
-        function formatTime(seconds) {
-            const mins = Math.floor(seconds / 60);
-            const secs = seconds % 60;
-            return `${mins}:${secs.toString().padStart(2, '0')}`;
-        }
+    // FEN tracking variables
+    window.currentFen = null;
+    window.gameStarted = false;
 
-        // Update timer display
-        function updateDisplay() {
-            document.getElementById('player1-time').textContent = formatTime(player1Time);
-            document.getElementById('player2-time').textContent = formatTime(player2Time);
+    console.log('🚀 Initializing chess timer...');
+    console.log('Match ID:', matchId);
+    console.log('Current Player:', currentPlayer);
+    console.log('Is Active:', isActive);
+
+    // SocketIO Event Listeners
+    socket.on('connect', function() {
+        console.log('✅ SocketIO connected successfully');
+    });
+
+    socket.on('disconnect', function() {
+        console.log('❌ SocketIO disconnected');
+    });
+
+    socket.on('timer_started', function(data) {
+        console.log('✅ timer_started event received:', data);
+    });
+
+    socket.on('move_completed', function(data) {
+        console.log('✅ move_completed event received:', data);
+        showMoveNotification(data);
+    });
+
+    socket.on('timer_sync', function(data) {
+        player1Time = data.player1_time;
+        player2Time = data.player2_time;
+        currentPlayer = data.current_player;
+        isActive = data.is_active;
+        updateDisplay();
+        updateButtons();
+    });
+
+    socket.on('player_switched', function(data) {
+        currentPlayer = data.current_player;
+        updateDisplay();
+    });
+
+    // Join match room
+    socket.emit('join_match', {match_id: matchId});
+
+    // Format time untuk display
+    function formatTime(seconds) {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    async function getCurrentFEN() {
+        try {
+            console.log('🎥 Fetching from /api/detect_fen...');
+            const response = await fetch('/api/detect_fen');
             
-            // Update active player visual
-            const player1Card = document.getElementById('player1-card');
-            const player2Card = document.getElementById('player2-card');
-            
-            if (currentPlayer === 1) {
-                player1Card.classList.add('active');
-                player2Card.classList.remove('active');
-                document.getElementById('current-turn').textContent = '{{ match.player1.username }}';
-            } else {
-                player2Card.classList.add('active');
-                player1Card.classList.remove('active');
-                document.getElementById('current-turn').textContent = '{{ match.player2.username }}';
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
-        }
-
-        // Timer countdown
-        function startCountdown() {
-            if (!isActive) return;
             
-            timerInterval = setInterval(() => {
-                if (currentPlayer === 1) {
-                    player1Time--;
-                    if (player1Time <= 0) {
-                        player1Time = 0;
-                        pauseTimer();
-                        alert('{{ match.player1.username }} kehabisan waktu!');
-                    }
-                } else {
-                    player2Time--;
-                    if (player2Time <= 0) {
-                        player2Time = 0;
-                        pauseTimer();
-                        alert('{{ match.player2.username }} kehabisan waktu!');
-                    }
+            const data = await response.json();
+            console.log('📊 Detection response:', data);
+            
+            if (data.success) {
+                console.log('✅ FEN detected successfully:', data.fen);
+                return data.fen;
+            } else {
+                console.error('❌ FEN detection failed:', data.error);
+                throw new Error(data.error || 'FEN detection failed');
+            }
+        } catch (error) {
+            console.error('❌ Error in getCurrentFEN:', error);
+            throw error;
+        }
+    }
+
+    // Update timer display
+    function updateDisplay() {
+        document.getElementById('player1-time').textContent = formatTime(player1Time);
+        document.getElementById('player2-time').textContent = formatTime(player2Time);
+        
+        // Update active player visual
+        const player1Card = document.getElementById('player1-card');
+        const player2Card = document.getElementById('player2-card');
+        
+        if (currentPlayer === 1) {
+            player1Card.classList.add('active');
+            player2Card.classList.remove('active');
+            document.getElementById('current-turn').textContent = '{{ match.player1.username }}';
+        } else {
+            player2Card.classList.add('active');
+            player1Card.classList.remove('active');
+            document.getElementById('current-turn').textContent = '{{ match.player2.username }}';
+        }
+    }
+
+    // Timer countdown
+    function startCountdown() {
+        if (!isActive) return;
+        
+        timerInterval = setInterval(() => {
+            if (currentPlayer === 1) {
+                player1Time--;
+                if (player1Time <= 0) {
+                    player1Time = 0;
+                    pauseTimer();
+                    alert('{{ match.player1.username }} kehabisan waktu!');
                 }
-                
-                updateDisplay();
-                
-                // Sync dengan server
-                socket.emit('timer_update', {
-                    match_id: matchId,
-                    player: currentPlayer,
-                    time: currentPlayer === 1 ? player1Time : player2Time,
-                    current_player: currentPlayer,
-                    is_active: isActive
-                });
-            }, 1000);
-        }
-
-        // Control functions
-        function startTimer() {
-            isActive = true;
-            startCountdown();
-            updateButtons();
-        }
-
-        function pauseTimer() {
-            isActive = false;
-            clearInterval(timerInterval);
-            updateButtons();
-        }
-
-        function resetTimer() {
-            pauseTimer();
-            player1Time = 600; // 10 menit
-            player2Time = 600;
-            currentPlayer = 1;
+            } else {
+                player2Time--;
+                if (player2Time <= 0) {
+                    player2Time = 0;
+                    pauseTimer();
+                    alert('{{ match.player2.username }} kehabisan waktu!');
+                }
+            }
+            
             updateDisplay();
             
+            // Sync dengan server
             socket.emit('timer_update', {
                 match_id: matchId,
                 player: currentPlayer,
-                time: player1Time,
+                time: currentPlayer === 1 ? player1Time : player2Time,
                 current_player: currentPlayer,
-                is_active: false
+                is_active: isActive
             });
+        }, 1000);
+    }
+
+    // Control functions
+    async function startTimer() {
+        try {
+            console.log('🚀 Starting timer...');
+            
+            // Show loading indicator
+            const startBtn = document.getElementById('start-btn');
+            const originalText = startBtn.innerHTML;
+            startBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Detecting Board...';
+            startBtn.disabled = true;
+
+            // Cek SocketIO connection
+            if (!socket.connected) {
+                console.error('❌ SocketIO not connected!');
+                alert('Connection error. Please refresh the page.');
+                startBtn.innerHTML = originalText;
+                startBtn.disabled = false;
+                return;
+            }
+
+            // Dapatkan FEN awal
+            console.log('🔍 Getting initial FEN...');
+            const initialFen = await getCurrentFEN();
+            
+            if (initialFen) {
+                window.currentFen = initialFen;
+                window.gameStarted = true;
+                console.log('✅ Initial FEN captured:', initialFen);
+            } else {
+                console.error('❌ Failed to get initial FEN');
+                alert('Could not detect chess board. Please ensure the board is visible and try again.');
+                startBtn.innerHTML = originalText;
+                startBtn.disabled = false;
+                return;
+            }
+
+            console.log('⏰ Starting countdown...');
+            isActive = true;
+            startCountdown();
+            updateButtons();
+
+            // Kirim ke server dengan FEN awal
+            console.log('📤 Sending start_timer_with_fen event...');
+            console.log('📊 Event data:', {
+                match_id: matchId,
+                initial_fen: initialFen
+            });
+            
+            socket.emit('start_timer_with_fen', {
+                match_id: matchId,
+                initial_fen: initialFen
+            });
+
+            console.log('✅ Timer started successfully');
+
+        } catch (error) {
+            console.error('❌ Error in startTimer:', error);
+            alert(`Error starting timer: ${error.message}. Please try again.`);
+            
+            // Reset button state
+            const startBtn = document.getElementById('start-btn');
+            startBtn.innerHTML = '<i class="fas fa-play mr-2"></i>START';
+            startBtn.disabled = false;
+            
+            // Reset game state
+            isActive = false;
+            window.gameStarted = false;
+            updateButtons();
+        }
+    }
+
+    function pauseTimer() {
+        isActive = false;
+        clearInterval(timerInterval);
+        updateButtons();
+    }
+
+    async function switchToPlayer(nextPlayer) {
+        if (!isActive) {
+            console.warn('⚠️ Timer not active, ignoring switch');
+            return;
+        }
+        
+        if (!window.gameStarted) {
+            console.warn('⚠️ Game not started, please click START first');
+            alert('Please click START button first to begin the game');
+            return;
         }
 
-        function switchToPlayer(nextPlayer) {
-            if (!isActive) return;
+        try {
+            console.log(`🔄 Switching from Player ${currentPlayer} to Player ${nextPlayer}`);
             
+            // Show loading pada card yang diklik
+            const currentCard = currentPlayer === 1 ? 
+                document.getElementById('player1-card') : 
+                document.getElementById('player2-card');
+            
+            const originalCardContent = currentCard.innerHTML;
+            currentCard.innerHTML = `
+                <div class="h-full flex flex-col justify-center items-center text-center p-6">
+                    <i class="fas fa-spinner fa-spin text-4xl mb-4"></i>
+                    <div class="text-lg font-bold">Detecting Move...</div>
+                </div>
+            `;
+
+            // Dapatkan FEN setelah move
+            const newFen = await getCurrentFEN();
+            
+            // Restore card content
+            currentCard.innerHTML = originalCardContent;
+            
+            if (newFen && window.currentFen) {
+                console.log('📤 Sending move_history event...', {
+                    match_id: matchId,
+                    player: currentPlayer,
+                    fen_after: newFen
+                });
+                
+                // Kirim move history ke server
+                socket.emit('move_history', {
+                    match_id: matchId,
+                    player: currentPlayer,
+                    fen_after: newFen
+                });
+
+                // Update FEN tracking untuk move berikutnya
+                window.currentFen = newFen;
+
+                console.log('✅ Move completed for player', currentPlayer);
+            } else {
+                console.warn('Could not capture FEN for move');
+                alert('Could not detect the move. Please ensure the board is visible and try again.');
+                return;
+            }
+
+            // Switch ke player berikutnya
             currentPlayer = nextPlayer;
             updateDisplay();
-            
+
             socket.emit('switch_player', {
                 match_id: matchId
             });
+
+        } catch (error) {
+            console.error('❌ Error switching player:', error);
+            alert('Error detecting move. Please try again.');
         }
+    }
 
-        function updateButtons() {
-            const startBtn = document.getElementById('start-btn');
-            const pauseBtn = document.getElementById('pause-btn');
-            
-            if (isActive) {
-                startBtn.disabled = true;
-                startBtn.classList.add('opacity-50', 'cursor-not-allowed');
-                pauseBtn.disabled = false;
-                pauseBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-            } else {
-                startBtn.disabled = false;
-                startBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-                pauseBtn.disabled = true;
-                pauseBtn.classList.add('opacity-50', 'cursor-not-allowed');
-            }
+    function updateButtons() {
+        const startBtn = document.getElementById('start-btn');
+        
+        if (!startBtn) {
+            console.error('❌ Start button not found');
+            return;
         }
-
-        // Socket listeners
-        socket.on('timer_sync', function(data) {
-            player1Time = data.player1_time;
-            player2Time = data.player2_time;
-            currentPlayer = data.current_player;
-            isActive = data.is_active;
-            updateDisplay();
-            updateButtons();
-        });
-
-        socket.on('player_switched', function(data) {
-            currentPlayer = data.current_player;
-            updateDisplay();
-        });
-
-        // Initialize
-        updateDisplay();
-        updateButtons();
         
         if (isActive) {
-            startCountdown();
+            startBtn.disabled = true;
+            startBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            startBtn.innerHTML = '<i class="fas fa-play mr-2"></i>GAME ACTIVE';
+        } else {
+            startBtn.disabled = false;
+            startBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            startBtn.innerHTML = '<i class="fas fa-play mr-2"></i>START';
         }
-    </script>
+    }
+
+    // Function untuk menampilkan notifikasi move
+    function showMoveNotification(moveData) {
+        const notification = document.createElement('div');
+        notification.className = 'move-notification bg-green-500 text-white px-4 py-2 rounded-lg fixed top-4 right-4 z-50';
+        notification.innerHTML = `
+            <div class="font-bold">Move ${moveData.move_number}</div>
+            <div>Player ${moveData.player}: ${moveData.uci_move || 'Position updated'}</div>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Remove after 3 seconds
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 3000);
+    }
+
+    // Initialize
+    updateDisplay();
+    updateButtons();
+    
+    if (isActive) {
+        startCountdown();
+        window.gameStarted = true;
+    }
+</script>
 </body>
 </html>

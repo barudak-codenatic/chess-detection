@@ -51,3 +51,15 @@ class GameSession(db.Model):
     last_move_time = db.Column(db.DateTime, default=datetime.now)
     
     match = db.relationship('Match', backref='sessions')
+
+class MoveHistory(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    match_id = db.Column(db.Integer, db.ForeignKey('match.id'), nullable=False)
+    move_number = db.Column(db.Integer, nullable=False)
+    player = db.Column(db.Integer, nullable=False)  # 1 atau 2
+    fen_before = db.Column(db.String(120), nullable=True)
+    fen_after = db.Column(db.String(120), nullable=True)
+    uci_move = db.Column(db.String(10), nullable=True)  # e2e4, d7d5, dst
+    timestamp = db.Column(db.DateTime, default=datetime.now)
+
+    match = db.relationship('Match', backref='move_histories')

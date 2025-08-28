@@ -371,6 +371,113 @@
                 </div>
             </div>
         </div>
+        <!-- Tambahkan section Move History setelah Action Log -->
+<!-- Move History Section -->
+<div class="mt-8">
+    <div class="card-elegant rounded-2xl p-6 border-2 border-amber-200">
+        <div class="flex justify-between items-center mb-6">
+            <div class="flex items-center">
+                <i class="fas fa-chess-board text-2xl text-amber-800 mr-3"></i>
+                <h2 class="text-xl font-bold text-amber-900">Move History</h2>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button 
+                    class="btn-elegant bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition-all duration-200 flex items-center"
+                    onclick="refreshMoveHistory()">
+                    <i class="fas fa-sync-alt mr-2"></i>Refresh
+                </button>
+                <button 
+                    class="btn-elegant bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm transition-all duration-200 flex items-center"
+                    onclick="exportMoveHistory()">
+                    <i class="fas fa-download mr-2"></i>Export PGN
+                </button>
+            </div>
+        </div>
+        
+        <!-- Move Statistics -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-amber-100 rounded-xl p-4 text-center">
+                <div class="text-2xl font-bold text-amber-800" id="total-moves">0</div>
+                <div class="text-sm text-amber-600">Total Moves</div>
+            </div>
+            <div class="bg-green-100 rounded-xl p-4 text-center">
+                <div class="text-2xl font-bold text-green-800" id="white-moves">0</div>
+                <div class="text-sm text-green-600">White Moves</div>
+            </div>
+            <div class="bg-blue-100 rounded-xl p-4 text-center">
+                <div class="text-2xl font-bold text-blue-800" id="black-moves">0</div>
+                <div class="text-sm text-blue-600">Black Moves</div>
+            </div>
+            <div class="bg-purple-100 rounded-xl p-4 text-center">
+                <div class="text-2xl font-bold text-purple-800" id="game-progress">0%</div>
+                <div class="text-sm text-purple-600">Game Progress</div>
+            </div>
+        </div>
+        
+        <!-- Move History Table -->
+        <div class="bg-white rounded-xl border-2 border-amber-200 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-amber-100">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-sm font-bold text-amber-800">Move #</th>
+                            <th class="px-4 py-3 text-left text-sm font-bold text-amber-800">Player</th>
+                            <th class="px-4 py-3 text-left text-sm font-bold text-amber-800">UCI Move</th>
+                            <th class="px-4 py-3 text-left text-sm font-bold text-amber-800">Chess Notation</th>
+                            <th class="px-4 py-3 text-left text-sm font-bold text-amber-800">Time</th>
+                            <th class="px-4 py-3 text-left text-sm font-bold text-amber-800">Status</th>
+                            <th class="px-4 py-3 text-left text-sm font-bold text-amber-800">FEN</th>
+                        </tr>
+                    </thead>
+                    <tbody id="move-history-table" class="divide-y divide-amber-200">
+                        <!-- Move rows will be populated by JavaScript -->
+                        <tr>
+                            <td colspan="7" class="px-4 py-8 text-center text-amber-600">
+                                <i class="fas fa-chess-pawn text-3xl mb-2"></i>
+                                <div>No moves recorded yet</div>
+                                <div class="text-sm">Moves will appear here as the game progresses</div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Current Position Display -->
+        <div class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-amber-50 rounded-xl p-4">
+                <h4 class="font-bold text-amber-800 mb-2 flex items-center">
+                    <i class="fas fa-eye mr-2"></i>Current Position (FEN)
+                </h4>
+                <div class="bg-white p-3 rounded-lg border border-amber-200">
+                    <code id="current-fen" class="text-sm text-gray-700 break-all">
+                        rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
+                    </code>
+                </div>
+                <button 
+                    class="mt-2 text-sm text-amber-600 hover:text-amber-800 flex items-center"
+                    onclick="copyFEN()">
+                    <i class="fas fa-copy mr-1"></i>Copy FEN
+                </button>
+            </div>
+            <div class="bg-amber-50 rounded-xl p-4">
+                <h4 class="font-bold text-amber-800 mb-2 flex items-center">
+                    <i class="fas fa-list mr-2"></i>Game Notation (PGN)
+                </h4>
+                <div class="bg-white p-3 rounded-lg border border-amber-200 h-32 overflow-y-auto">
+                    <div id="pgn-notation" class="text-sm text-gray-700 font-mono">
+                        Game not started
+                    </div>
+                </div>
+                <button 
+                    class="mt-2 text-sm text-amber-600 hover:text-amber-800 flex items-center"
+                    onclick="copyPGN()">
+                    <i class="fas fa-copy mr-1"></i>Copy PGN
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
     </div>
 
     <script>
@@ -929,9 +1036,232 @@
                 stopBtn.innerHTML = '<i class="fas fa-stop mr-2"></i>Stop OpenCV';
             }
         }
+        let moveHistory = [];
+let currentFEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+
+// Load move history from server
+async function loadMoveHistory() {
+    try {
+        const response = await fetch(`/api/moves/${matchId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            moveHistory = data.moves;
+            updateMoveHistoryDisplay();
+            updateMoveStatistics();
+            updateCurrentPosition();
+            generatePGN();
+            logAction(`Loaded ${moveHistory.length} moves from database`);
+        } else {
+            logAction('Error loading move history: ' + data.error);
+        }
+    } catch (error) {
+        logAction('Error loading move history: ' + error.message);
+        console.error('Error loading move history:', error);
+    }
+}
+
+// Update move history display
+function updateMoveHistoryDisplay() {
+    const tbody = document.getElementById('move-history-table');
+    
+    if (moveHistory.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="px-4 py-8 text-center text-amber-600">
+                    <i class="fas fa-chess-pawn text-3xl mb-2"></i>
+                    <div>No moves recorded yet</div>
+                    <div class="text-sm">Moves will appear here as the game progresses</div>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = moveHistory.map(move => {
+        const playerName = move.player === 1 ? '{{ match.player1.username }}' : '{{ match.player2.username }}';
+        const playerColor = move.player === 1 ? 'White' : 'Black';
+        const playerBadge = move.player === 1 ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800';
+        const playerIcon = move.player === 1 ? 'fa-chess-king' : 'fa-chess-queen';
+        
+        // Status
+        let statusBadge = '';
+        if (!move.fen_after) {
+            statusBadge = '<span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">In Progress</span>';
+        } else if (!move.uci_move) {
+            statusBadge = '<span class="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">Detection Failed</span>';
+        } else {
+            statusBadge = '<span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Completed</span>';
+        }
+        
+        // Chess notation (convert UCI to algebraic if possible)
+        const chessNotation = move.uci_move ? convertUCIToAlgebraic(move.uci_move) : '-';
+        
+        // Time formatting
+        const moveTime = move.timestamp ? new Date(move.timestamp).toLocaleTimeString() : '-';
+        
+        // FEN display (truncated)
+        const fenDisplay = move.fen_after ? 
+            `<code class="text-xs bg-gray-100 px-2 py-1 rounded cursor-pointer" onclick="showFullFEN('${move.fen_after}')" title="Click to view full FEN">
+                ${move.fen_after.substring(0, 20)}...
+            </code>` : 
+            '<span class="text-gray-400">-</span>';
+        
+        return `
+            <tr class="hover:bg-amber-50 transition-colors">
+                <td class="px-4 py-3 font-mono font-bold text-amber-800">${move.move_number}</td>
+                <td class="px-4 py-3">
+                    <div class="flex items-center">
+                        <span class="px-2 py-1 ${playerBadge} rounded-full text-xs mr-2">
+                            <i class="fas ${playerIcon} mr-1"></i>${playerColor}
+                        </span>
+                        <span class="text-sm text-gray-600">${playerName}</span>
+                    </div>
+                </td>
+                <td class="px-4 py-3">
+                    <code class="bg-blue-100 text-blue-800 px-2 py-1 rounded font-mono text-sm">
+                        ${move.uci_move || '-'}
+                    </code>
+                </td>
+                <td class="px-4 py-3 font-bold text-gray-800">${chessNotation}</td>
+                <td class="px-4 py-3 text-sm text-gray-600">${moveTime}</td>
+                <td class="px-4 py-3">${statusBadge}</td>
+                <td class="px-4 py-3">${fenDisplay}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// Update move statistics
+function updateMoveStatistics() {
+    const totalMoves = moveHistory.filter(m => m.uci_move).length;
+    const whiteMoves = moveHistory.filter(m => m.player === 1 && m.uci_move).length;
+    const blackMoves = moveHistory.filter(m => m.player === 2 && m.uci_move).length;
+    const gameProgress = Math.min(100, Math.round((totalMoves / 40) * 100)); // Assume 40 moves per game
+    
+    document.getElementById('total-moves').textContent = totalMoves;
+    document.getElementById('white-moves').textContent = whiteMoves;
+    document.getElementById('black-moves').textContent = blackMoves;
+    document.getElementById('game-progress').textContent = gameProgress + '%';
+}
+
+// Update current position
+function updateCurrentPosition() {
+    const lastMove = moveHistory.filter(m => m.fen_after).pop();
+    if (lastMove) {
+        currentFEN = lastMove.fen_after;
+        document.getElementById('current-fen').textContent = currentFEN;
+    }
+}
+
+// Convert UCI to algebraic notation (basic conversion)
+function convertUCIToAlgebraic(uci) {
+    if (!uci || uci.length < 4) return uci;
+    
+    const from = uci.substring(0, 2);
+    const to = uci.substring(2, 4);
+    const promotion = uci.length > 4 ? uci.substring(4) : '';
+    
+    // Basic conversion (this would need chess.js for proper conversion)
+    return `${from}-${to}${promotion ? '=' + promotion.toUpperCase() : ''}`;
+}
+
+// Generate PGN notation
+function generatePGN() {
+    const validMoves = moveHistory.filter(m => m.uci_move);
+    if (validMoves.length === 0) {
+        document.getElementById('pgn-notation').textContent = 'Game not started';
+        return;
+    }
+    
+    let pgn = '';
+    for (let i = 0; i < validMoves.length; i += 2) {
+        const moveNumber = Math.floor(i / 2) + 1;
+        const whiteMove = validMoves[i];
+        const blackMove = validMoves[i + 1];
+        
+        pgn += `${moveNumber}. ${convertUCIToAlgebraic(whiteMove.uci_move)}`;
+        if (blackMove) {
+            pgn += ` ${convertUCIToAlgebraic(blackMove.uci_move)}`;
+        }
+        pgn += ' ';
+    }
+    
+    document.getElementById('pgn-notation').textContent = pgn.trim();
+}
+
+// Utility functions
+function showFullFEN(fen) {
+    alert(`Full FEN: ${fen}`);
+}
+
+function copyFEN() {
+    navigator.clipboard.writeText(currentFEN).then(() => {
+        logAction('FEN copied to clipboard');
+    });
+}
+
+function copyPGN() {
+    const pgn = document.getElementById('pgn-notation').textContent;
+    navigator.clipboard.writeText(pgn).then(() => {
+        logAction('PGN copied to clipboard');
+    });
+}
+
+function refreshMoveHistory() {
+    logAction('Refreshing move history...');
+    loadMoveHistory();
+}
+
+function exportMoveHistory() {
+    const pgn = document.getElementById('pgn-notation').textContent;
+    const matchInfo = `[Event "ChessMon Match"]
+[Site "ChessMon System"]
+[Date "${new Date().toISOString().split('T')[0]}"]
+[Round "1"]
+[White "{{ match.player1.username }}"]
+[Black "{{ match.player2.username }}"]
+[Result "*"]
+
+${pgn}`;
+    
+    const blob = new Blob([matchInfo], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `match_${matchId}_moves.pgn`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    logAction('Move history exported as PGN');
+}
+
+// Socket listeners for real-time updates
+socket.on('move_completed', function(data) {
+    logAction(`Move completed: ${data.player === 1 ? '{{ match.player1.username }}' : '{{ match.player2.username }}'} - ${data.uci_move}`);
+    
+    // Add to local move history
+    const moveIndex = moveHistory.findIndex(m => m.move_number === data.move_number && m.player === data.player);
+    if (moveIndex >= 0) {
+        moveHistory[moveIndex] = { ...moveHistory[moveIndex], ...data };
+    } else {
+        moveHistory.push(data);
+    }
+    
+    // Update displays
+    updateMoveHistoryDisplay();
+    updateMoveStatistics();
+    updateCurrentPosition();
+    generatePGN();
+});
 
         // Call on page load
-        document.addEventListener('DOMContentLoaded', updateControlButtonsText);
+        document.addEventListener('DOMContentLoaded', ()=>{
+            updateControlButtonsText();
+            setTimeout(() => {
+                loadMoveHistory();
+            }, 1500);
+        });
     </script>
 </body>
 </html>

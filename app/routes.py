@@ -293,3 +293,42 @@ def init_routes(app, login_manager):
             'show_bbox': detection_service.show_bbox
         })
 
+    @app.route('/api/moves/<int:match_id>')
+    @login_required
+    def get_moves(match_id):
+        """Get move history for a match"""
+        match = Match.query.get_or_404(match_id)
+        
+        # Check access permission
+        if current_user.role != 'admin' and current_user.id not in [match.player1_id, match.player2_id]:
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        try:
+            from models import MoveHistory
+            moves = MoveHistory.query.filter_by(match_id=match_id).order_by(MoveHistory.move_number).all()
+            
+            moves_data = []
+            for move in moves:
+                moves_data.append({
+                    'id': move.id,
+                    'move_number': move.move_number,
+                    'player': move.player,
+                    'fen_before': move.fen_before,
+                    'fen_after': move.fen_after,
+                    'uci_move': move.uci_move,
+                    'timestamp': move.timestamp.isoformat() if move.timestamp else None
+                })
+            
+            return jsonify({
+                'success': True,
+                'moves': moves_data,
+                'total_moves': len(moves_data),
+                'completed_moves': len([m for m in moves_data if m['uci_move']]),
+                'match_id': match_id
+            })
+        
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': f'Error retrieving moves: {str(e)}'
+            }), 500
